@@ -9,7 +9,7 @@ import { useDiscoverStore, useChatStore, useAuthStore, useStoryStore } from '../
 import { SwipeCard } from '../../../components/SwipeCard';
 import { MatchModal } from '../../../components/MatchModal';
 import { StoryCircle } from '../../../components/StoryCircle';
-import { CloseIcon, StarIcon, HeartIcon } from '../../../components/Icons';
+import { CloseIcon, StarIcon, HeartIcon, DiscoverIcon } from '../../../components/Icons';
 import type { SwipeProfile } from '../../../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -96,7 +96,7 @@ export default function DiscoverScreen() {
           }).reverse()
         ) : (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🔄</Text>
+            <DiscoverIcon size={60} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No more people nearby</Text>
             <Text style={styles.emptyText}>Check back later for new frnds!</Text>
           </View>
@@ -135,14 +135,13 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   storiesBar: { paddingHorizontal: 16, paddingVertical: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  cardStack: { flex: 1, marginHorizontal: 16, marginTop: 8, maxHeight: 520 },
+  cardStack: { flex: 1, marginHorizontal: 16, marginTop: 8 },
   actions: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingVertical: 16 },
   actionBtn: { borderRadius: 999, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
   nopeBtn: { width: 52, height: 52, backgroundColor: Colors.bgElevated },
   starBtn: { width: 44, height: 44, backgroundColor: Colors.bgElevated },
   likeBtn: { width: 52, height: 52, backgroundColor: Colors.bgElevated },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: { fontSize: 60, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, marginTop: 16 },
   emptyText: { fontSize: 14, color: Colors.textMuted },
 });
