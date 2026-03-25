@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { User, SwipeProfile, ChatPreview, StoryGroup, Message } from '../types';
 import { generateProfiles, generateChats, generateStories, generateMessages, getRandomReply } from './mock-data';
-import { api, setToken, connectSocket, disconnectSocket, getSocket } from './api';
+import { api, setToken, getToken, connectSocket, disconnectSocket, getSocket } from './api';
 
 // Auth Store
 interface AuthState {
@@ -106,6 +106,11 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   loading: false,
   init: async () => {
     set({ loading: true });
+    if (!getToken()) {
+      // No auth token = mock mode, skip API
+      set({ profiles: generateProfiles(), currentIndex: 0, loading: false });
+      return;
+    }
     try {
       const res = await api.discover();
       const profiles: SwipeProfile[] = (res.users || res).map((u: any) => ({
@@ -115,8 +120,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
       set({ profiles, currentIndex: 0, loading: false });
     } catch (err) {
       console.warn('API discover failed, using mock fallback:', err);
-      const profiles = generateProfiles();
-      set({ profiles, currentIndex: 0, loading: false });
+      set({ profiles: generateProfiles(), currentIndex: 0, loading: false });
     }
   },
   swipe: async (direction) => {
@@ -167,6 +171,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loading: false,
   init: async () => {
     set({ loading: true });
+    if (!getToken()) {
+      const discoverProfiles = useDiscoverStore.getState().profiles;
+      const chats = generateChats(discoverProfiles);
+      const messages: Record<string, Message[]> = {};
+      chats.forEach((c) => { messages[c.matchId] = generateMessages(2 + Math.floor(Math.random() * 4)); });
+      set({ chats, messages, loading: false });
+      return;
+    }
     try {
       const res = await api.getMatches();
       const matches = res.matches || res;
@@ -308,6 +320,11 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   loading: false,
   init: async () => {
     set({ loading: true });
+    if (!getToken()) {
+      const discoverProfiles = useDiscoverStore.getState().profiles;
+      set({ storyGroups: generateStories(discoverProfiles), loading: false });
+      return;
+    }
     try {
       const res = await api.getStories();
       const storyGroups: StoryGroup[] = res.stories || res;

@@ -21,7 +21,10 @@ async function request(path: string, options: RequestInit = {}) {
     headers['Authorization'] = `Bearer ${authToken}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
+  clearTimeout(timeout);
   const data = await res.json();
 
   if (!res.ok) {
