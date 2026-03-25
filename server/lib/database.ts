@@ -1,29 +1,47 @@
-import Database from 'better-sqlite3';
+import initSqlJs, { Database } from 'sql.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import path from 'path';
 
-// Use DB_PATH env var, fallback to /tmp/frnds.db for cloud or ./frnds.db for local
-function resolveDbPath(): string {
-  if (process.env.DB_PATH) {
-    return path.resolve(process.env.DB_PATH);
+let db: Database | null = null;
+
+// Helper: run a query that returns rows
+export function query(sql: string, params: any[] = []): any[] {
+  if (!db) throw new Error('Database not initialized');
+  const stmt = db.prepare(sql);
+  if (params.length > 0) stmt.bind(params);
+  const results: any[] = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
   }
-  if (process.env.NODE_ENV === 'production') {
-    return '/tmp/frnds.db';
-  }
-  return path.join(__dirname, '..', '..', 'frnds.db');
+  stmt.free();
+  return results;
 }
 
-const DB_PATH = resolveDbPath();
-console.log(`[database] Using SQLite at: ${DB_PATH}`);
+// Helper: run a query that returns a single row or undefined
+export function queryOne(sql: string, params: any[] = []): any | undefined {
+  const rows = query(sql, params);
+  return rows.length > 0 ? rows[0] : undefined;
+}
 
-const db = new Database(DB_PATH);
+// Helper: run a statement (INSERT, UPDATE, DELETE) that doesn't return rows
+export function run(sql: string, params: any[] = []): void {
+  if (!db) throw new Error('Database not initialized');
+  db.run(sql, params);
+}
 
-// Enable WAL mode for better concurrency
-db.pragma('journal_mode = WAL');
+// Helper: execute DDL or multi-statement SQL
+export function exec(sql: string): void {
+  if (!db) throw new Error('Database not initialized');
+  db.exec(sql);
+}
 
-// Create tables
-db.exec(`
+export function getDb(): Database {
+  if (!db) throw new Error('Database not initialized');
+  return db;
+}
+
+// ===== SCHEMA =====
+const SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -89,7 +107,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_matches_user2 ON matches(user2_id);
   CREATE INDEX IF NOT EXISTS idx_messages_match ON messages(match_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id, expires_at);
-`);
+`;
 
 // ===== DEMO SEED DATA =====
 const DEMO_USERS = [
@@ -109,32 +127,34 @@ const DEMO_USERS = [
 ];
 
 export function seedDemoUsers(): { seeded: boolean; count: number } {
-  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+  const row = queryOne('SELECT COUNT(*) as count FROM users');
+  const userCount = row?.count ?? 0;
 
-  if (userCount.count > 0) {
-    return { seeded: false, count: userCount.count };
+  if (userCount > 0) {
+    return { seeded: false, count: userCount };
   }
 
   console.log('[database] Seeding demo users...');
   const passwordHash = bcrypt.hashSync('demo1234', 10);
 
-  const insertUser = db.prepare(`
-    INSERT INTO users (id, email, password_hash, username, display_name, avatar, bio, age, interests, is_online)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-  `);
+  for (const u of DEMO_USERS) {
+    const id = crypto.randomUUID();
+    const avatar = u.displayName.substring(0, 2).toUpperCase();
+    const email = `${u.username}@demo.frnds.app`;
+    run(
+      `INSERT INTO users (id, email, password_hash, username, display_name, avatar, bio, age, interests, is_online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [id, email, passwordHash, u.username, u.displayName, avatar, u.bio, u.age, JSON.stringify(u.interests)]
+    );
+  }
 
-  const insertMany = db.transaction((users: typeof DEMO_USERS) => {
-    for (const u of users) {
-      const id = crypto.randomUUID();
-      const avatar = u.displayName.substring(0, 2).toUpperCase();
-      const email = `${u.username}@demo.frnds.app`;
-      insertUser.run(id, email, passwordHash, u.username, u.displayName, avatar, u.bio, u.age, JSON.stringify(u.interests));
-    }
-  });
-
-  insertMany(DEMO_USERS);
   console.log(`[database] Seeded ${DEMO_USERS.length} demo users`);
   return { seeded: true, count: DEMO_USERS.length };
 }
 
-export default db;
+export async function initDatabase(): Promise<void> {
+  console.log('[database] Initializing sql.js (in-memory SQLite via WASM)...');
+  const SQL = await initSqlJs();
+  db = new SQL.Database();
+  exec(SCHEMA);
+  console.log('[database] Schema created');
+}

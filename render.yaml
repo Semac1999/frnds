@@ -3,7 +3,7 @@ services:
     name: frnds-api
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install --legacy-peer-deps
     startCommand: npx tsx server/index.ts
     envVars:
       - key: JWT_SECRET

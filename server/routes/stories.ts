@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
-import db from '../lib/database';
+import crypto from 'crypto';
+import { query, queryOne, run } from '../lib/database';
 import { AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -7,7 +8,7 @@ const router = Router();
 // GET /api/stories — get active stories from matches
 router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
   // Get stories from matched users that haven't expired
-  const stories = db.prepare(`
+  const stories = query(`
     SELECT s.*, u.display_name, u.avatar, u.username,
       CASE WHEN sv.viewer_id IS NOT NULL THEN 1 ELSE 0 END as seen
     FROM stories s
@@ -19,7 +20,7 @@ router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
         FROM matches WHERE user1_id = ? OR user2_id = ?
       ))
     ORDER BY s.user_id, s.created_at
-  `).all(req.userId, req.userId, req.userId, req.userId, req.userId);
+  `, [req.userId, req.userId, req.userId, req.userId, req.userId]);
 
   // Group by user
   const groups: Record<string, any> = {};
@@ -52,17 +53,17 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response) => {
   if (!content) return res.status(400).json({ error: 'Content required' });
 
   const id = crypto.randomUUID();
-  db.prepare('INSERT INTO stories (id, user_id, content, type, background) VALUES (?, ?, ?, ?, ?)').run(
+  run('INSERT INTO stories (id, user_id, content, type, background) VALUES (?, ?, ?, ?, ?)', [
     id, req.userId, content, type || 'text', background || '#6C5CE7,#fd79a8'
-  );
+  ]);
 
-  const story = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
+  const story = queryOne('SELECT * FROM stories WHERE id = ?', [id]);
   res.status(201).json(story);
 });
 
 // POST /api/stories/:id/view
 router.post('/:id/view', authMiddleware, (req: AuthRequest, res: Response) => {
-  db.prepare('INSERT OR IGNORE INTO story_views (story_id, viewer_id) VALUES (?, ?)').run(req.params.id, req.userId);
+  run('INSERT OR IGNORE INTO story_views (story_id, viewer_id) VALUES (?, ?)', [req.params.id, req.userId]);
   res.json({ ok: true });
 });
 

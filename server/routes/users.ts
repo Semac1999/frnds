@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import db from '../lib/database';
+import { query, queryOne, run } from '../lib/database';
 import { AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -7,22 +7,22 @@ const router = Router();
 // GET /api/users/discover — get unswiped profiles
 router.get('/discover', authMiddleware, (req: AuthRequest, res: Response) => {
   const limit = parseInt(req.query.limit as string) || 20;
-  const users = db.prepare(`
+  const users = query(`
     SELECT id, username, display_name, avatar, bio, age, interests, is_online
     FROM users
     WHERE id != ?
       AND id NOT IN (SELECT swiped_id FROM swipes WHERE swiper_id = ?)
     ORDER BY RANDOM()
     LIMIT ?
-  `).all(req.userId, req.userId, limit);
+  `, [req.userId, req.userId, limit]);
 
-  const parsed = (users as any[]).map((u) => ({ ...u, interests: JSON.parse(u.interests || '[]') }));
+  const parsed = users.map((u: any) => ({ ...u, interests: JSON.parse(u.interests || '[]') }));
   res.json(parsed);
 });
 
 // GET /api/users/:id
 router.get('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
-  const user: any = db.prepare('SELECT id, username, display_name, avatar, bio, age, interests, is_online FROM users WHERE id = ?').get(req.params.id);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ ...user, interests: JSON.parse(user.interests || '[]') });
 });
@@ -41,9 +41,9 @@ router.patch('/me', authMiddleware, (req: AuthRequest, res: Response) => {
   if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
   values.push(req.userId);
-  db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
 
-  const user: any = db.prepare('SELECT id, username, display_name, avatar, bio, age, interests, is_online FROM users WHERE id = ?').get(req.userId);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online FROM users WHERE id = ?', [req.userId]);
   res.json({ ...user, interests: JSON.parse(user.interests || '[]') });
 });
 

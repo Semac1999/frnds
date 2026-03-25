@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import db from '../lib/database';
+import { query, queryOne, run } from '../lib/database';
 import { generateToken, AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -21,7 +21,7 @@ router.post('/signup', (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: 'Must be at least 13 years old' });
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
+  const existing = queryOne('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
   if (existing) {
     return res.status(409).json({ error: 'Email or username already taken' });
   }
@@ -30,13 +30,13 @@ router.post('/signup', (req: AuthRequest, res: Response) => {
   const passwordHash = bcrypt.hashSync(password, 10);
   const avatar = displayName.substring(0, 2).toUpperCase();
 
-  db.prepare(`
+  run(`
     INSERT INTO users (id, email, password_hash, username, display_name, avatar, age, interests, is_online)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(id, email, passwordHash, username, displayName, avatar, age, JSON.stringify(interests || []));
+  `, [id, email, passwordHash, username, displayName, avatar, age, JSON.stringify(interests || [])]);
 
   const token = generateToken(id);
-  const user = db.prepare('SELECT id, username, display_name, avatar, bio, age, interests, is_online, created_at FROM users WHERE id = ?').get(id);
+  const user = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [id]);
 
   res.status(201).json({ token, user: { ...user as any, interests: JSON.parse((user as any).interests || '[]') } });
 });
@@ -48,12 +48,12 @@ router.post('/login', (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const user: any = db.prepare('SELECT * FROM users WHERE email = ? OR username = ?').get(email, email);
+  const user: any = queryOne('SELECT * FROM users WHERE email = ? OR username = ?', [email, email]);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  db.prepare('UPDATE users SET is_online = 1 WHERE id = ?').run(user.id);
+  run('UPDATE users SET is_online = 1 WHERE id = ?', [user.id]);
   const token = generateToken(user.id);
 
   const { password_hash, ...safeUser } = user;
@@ -62,14 +62,14 @@ router.post('/login', (req: AuthRequest, res: Response) => {
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req: AuthRequest, res: Response) => {
-  const user: any = db.prepare('SELECT id, username, display_name, avatar, bio, age, interests, is_online, created_at FROM users WHERE id = ?').get(req.userId);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [req.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ ...user, interests: JSON.parse(user.interests || '[]') });
 });
 
 // POST /api/auth/logout
 router.post('/logout', authMiddleware, (req: AuthRequest, res: Response) => {
-  db.prepare('UPDATE users SET is_online = 0, last_seen = datetime("now") WHERE id = ?').run(req.userId);
+  run('UPDATE users SET is_online = 0, last_seen = datetime("now") WHERE id = ?', [req.userId]);
   res.json({ ok: true });
 });
 
