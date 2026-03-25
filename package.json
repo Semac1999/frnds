@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "server": "npx tsx server/index.ts",
+    "start:server": "tsx server/index.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {

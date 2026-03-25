@@ -38,7 +38,7 @@ router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
       id: s.id,
       content: s.content,
       type: s.type,
-      background: s.background.split(','),
+      background: (s.background || '#6C5CE7,#fd79a8').split(','),
       time: s.created_at,
     });
     if (!s.seen) groups[s.user_id].seen = false;
