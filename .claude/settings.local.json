@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npx:*)",
+      "Bash(find G:/AI/frnds -maxdepth 2 -type f -name *.json)",
+      "Bash(mkdir -p _old)",
+      "Bash(mv app.js index.html manifest.json server.js styles.css _old/)",
+      "Bash(npx create-expo-app@latest . --template blank-typescript --no-install)",
+      "Read(//g/AI/**)",
+      "Bash(npx create-expo-app@latest frnds-temp --template blank-typescript --no-install)",
+      "Bash(npm install:*)",
+      "Bash(npx expo:*)",
+      "Bash(npx tsc:*)",
+      "Bash(taskkill //F //IM node.exe)"
+    ]
+  }
+}

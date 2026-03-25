@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+dist/
+_old/
+*.db
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db

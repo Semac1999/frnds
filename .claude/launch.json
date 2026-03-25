@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frnds-app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["G:/AI/frnds/start-web.js"],
+      "port": 8081
+    }
+  ]
+}
