@@ -9,8 +9,10 @@ import { useAuthStore } from '../../../lib/store';
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const logout = useAuthStore((s) => s.logout);
-  const [notifications, setNotifications] = useState(false);
+  const [notifications, setNotifications] = useState(true);
   const [showOnline, setShowOnline] = useState(true);
+  const [showDistance, setShowDistance] = useState(true);
+  const [ageRange, setAgeRange] = useState('18-25');
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -47,9 +49,30 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>DISCOVERY</Text>
+        <View style={styles.item}>
+          <Text style={styles.itemText}>Age Range</Text>
+          <TouchableOpacity onPress={() => {
+            Alert.alert('Age Range', 'Choose age range', [
+              { text: '18-20', onPress: () => setAgeRange('18-20') },
+              { text: '18-25', onPress: () => setAgeRange('18-25') },
+              { text: '21-30', onPress: () => setAgeRange('21-30') },
+              { text: 'All ages', onPress: () => setAgeRange('13+') },
+            ]);
+          }}>
+            <Text style={styles.itemValue}>{ageRange}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.item}>
+          <Text style={styles.itemText}>Show Distance</Text>
+          <Switch trackColor={{ true: Colors.primary }} value={showDistance} onValueChange={setShowDistance} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>PREFERENCES</Text>
         <View style={styles.item}>
-          <Text style={styles.itemText}>Notifications</Text>
+          <Text style={styles.itemText}>Push Notifications</Text>
           <Switch trackColor={{ true: Colors.primary }} value={notifications} onValueChange={setNotifications} />
         </View>
         <View style={styles.item}>

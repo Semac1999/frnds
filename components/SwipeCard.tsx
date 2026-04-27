@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, interpolate, SharedValue } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
 import { InterestTag } from './InterestTag';
+import { LocationIcon } from './Icons';
 import type { SwipeProfile } from '../types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Props {
   profile: SwipeProfile;
@@ -16,6 +15,7 @@ interface Props {
 }
 
 export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props) {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const animatedStyle = useAnimatedStyle(() => {
     if (!isTop || !translateX) {
       return {
@@ -44,16 +44,23 @@ export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props)
     return { opacity: interpolate(translateX.value, [0, -SCREEN_WIDTH / 4], [0, 1]) };
   });
 
+  const photoUri = profile.photo || profile.avatar;
+  const hasPhoto = photoUri && (photoUri.startsWith('data:image') || photoUri.startsWith('http') || photoUri.startsWith('file:'));
+
   return (
     <Animated.View style={[styles.card, animatedStyle, { zIndex: 10 - stackIndex }]}>
-      <LinearGradient
-        colors={[...profile.gradient]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.background}
-      >
-        <Text style={styles.avatarText}>{profile.avatar}</Text>
-      </LinearGradient>
+      {hasPhoto ? (
+        <Image source={{ uri: photoUri }} style={styles.backgroundPhoto} resizeMode="cover" />
+      ) : (
+        <LinearGradient
+          colors={[...profile.gradient]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.background}
+        >
+          <Text style={styles.avatarText}>{profile.avatar}</Text>
+        </LinearGradient>
+      )}
       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.gradient} />
 
       {isTop && (
@@ -71,6 +78,12 @@ export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props)
         <Text style={styles.name}>
           {profile.displayName} <Text style={styles.age}>{profile.age}</Text>
         </Text>
+        {profile.location && (
+          <View style={styles.location}>
+            <LocationIcon size={12} color={Colors.textSecondary} />
+            <Text style={styles.locationText}>{profile.location}</Text>
+          </View>
+        )}
         <Text style={styles.bio}>{profile.bio}</Text>
         <View style={styles.tags}>
           {profile.interests.slice(0, 3).map((tag) => (
@@ -101,6 +114,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  backgroundPhoto: {
+    flex: 1,
+    width: '100%',
+  },
   avatarText: {
     fontSize: 80,
     fontWeight: '900',
@@ -123,6 +140,8 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 26, fontWeight: '800', color: '#fff' },
   age: { fontSize: 22, fontWeight: '400', color: Colors.textSecondary },
+  location: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  locationText: { fontSize: 12, color: Colors.textSecondary },
   bio: { fontSize: 14, color: Colors.textSecondary, marginTop: 4, marginBottom: 8 },
   tags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   stamp: {

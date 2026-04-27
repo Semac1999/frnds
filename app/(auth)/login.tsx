@@ -19,16 +19,18 @@ export default function LoginScreen() {
     }
 
     try {
-      await login({ email: email.trim(), password: password.trim() });
+      await login({ email: email.trim().toLowerCase(), password: password.trim() });
 
-      // Init stores (works with both real API and mock fallback)
-      await useDiscoverStore.getState().init();
-      await useChatStore.getState().init();
-      await useStoryStore.getState().init();
+      // Init stores with real backend data
+      await Promise.all([
+        useDiscoverStore.getState().init(),
+        useChatStore.getState().init(),
+        useStoryStore.getState().init(),
+      ]);
 
       router.replace('/(tabs)/discover');
     } catch (err: any) {
-      Alert.alert('Login failed', err.message || 'Something went wrong');
+      Alert.alert('Login failed', err.message || 'Could not connect to server. Check your credentials.');
     }
   };
 

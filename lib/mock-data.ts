@@ -10,6 +10,7 @@ const BIOS = [
 ];
 const INTERESTS = ['music', 'gaming', 'sports', 'art', 'travel', 'food', 'movies', 'fitness', 'tech', 'fashion', 'photography', 'animals'];
 const AVATARS = ['AX', 'JD', 'RI', 'TY', 'MG', 'CS', 'AV', 'QN', 'SK', 'DK', 'PX', 'SG', 'RE', 'JM', 'CH', 'SM', 'BK', 'DW', 'FN', 'RV'];
+const LOCATIONS = ['New York', 'Los Angeles', 'London', 'Paris', 'Tokyo', 'Berlin', 'Amsterdam', 'Sydney', 'Toronto', 'Miami', 'Barcelona', 'Seoul', 'Austin', 'Denver', 'Chicago', 'San Francisco', 'Portland', 'Dublin', 'Stockholm', 'Montreal'];
 const GRADIENTS = [Gradients.card1, Gradients.card2, Gradients.card3, Gradients.card4, Gradients.card5];
 const MESSAGES = [
   'hey! how are you?', 'what are you up to?', "that's so cool!",
@@ -45,6 +46,7 @@ export function generateProfiles(count = 20): SwipeProfile[] {
     interests: shuffle(INTERESTS).slice(0, 2 + Math.floor(Math.random() * 3)),
     isOnline: Math.random() > 0.4,
     lastSeen: new Date().toISOString(),
+    location: LOCATIONS[i],
     gradient: GRADIENTS[i % GRADIENTS.length],
   }));
 }

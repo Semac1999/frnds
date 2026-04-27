@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "frnds",
+    "name": "frnds — meet your people",
     "slug": "frnds",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,7 +14,13 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.frnds.app"
+      "bundleIdentifier": "com.frnds.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "frnds uses your camera to take profile photos and snaps.",
+        "NSPhotoLibraryUsageDescription": "frnds lets you choose photos from your library for your profile and stories.",
+        "NSLocationWhenInUseUsageDescription": "frnds shows your approximate location to help you find people nearby."
+      },
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +29,13 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.frnds.app"
+      "package": "com.frnds.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -33,6 +45,12 @@
       "expo-router",
       "expo-font",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "frnds"
+      }
+    },
+    "owner": "frnds"
   }
 }

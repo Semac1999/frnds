@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { query, queryOne, run } from '../lib/database';
+import { query, queryOne, run, formatUser } from '../lib/database';
 import { generateToken, AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -36,9 +36,9 @@ router.post('/signup', (req: AuthRequest, res: Response) => {
   `, [id, email, passwordHash, username, displayName, avatar, age, JSON.stringify(interests || [])]);
 
   const token = generateToken(id);
-  const user = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [id]);
+  const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [id]);
 
-  res.status(201).json({ token, user: { ...user as any, interests: JSON.parse((user as any).interests || '[]') } });
+  res.status(201).json({ token, user: formatUser(user) });
 });
 
 // POST /api/auth/login
@@ -56,15 +56,14 @@ router.post('/login', (req: AuthRequest, res: Response) => {
   run('UPDATE users SET is_online = 1 WHERE id = ?', [user.id]);
   const token = generateToken(user.id);
 
-  const { password_hash, ...safeUser } = user;
-  res.json({ token, user: { ...safeUser, interests: JSON.parse(safeUser.interests || '[]') } });
+  res.json({ token, user: formatUser(user) });
 });
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req: AuthRequest, res: Response) => {
-  const user: any = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [req.userId]);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [req.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ ...user, interests: JSON.parse(user.interests || '[]') });
+  res.json(formatUser(user));
 });
 
 // POST /api/auth/logout

@@ -3,11 +3,14 @@ export interface User {
   username: string;
   displayName: string;
   avatar: string;
+  photo?: string | null;
+  photos?: string[];
   bio: string;
   age: number;
   interests: string[];
   isOnline: boolean;
   lastSeen: string;
+  location?: string;
 }
 
 export interface Match {

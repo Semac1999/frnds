@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActionSheetIOS, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors, Gradients } from '../../../constants/colors';
 import { useChatStore, useDiscoverStore } from '../../../lib/store';
-import { getSocket } from '../../../lib/api';
+import { getSocket, api } from '../../../lib/api';
 import { Avatar } from '../../../components/Avatar';
-import { BackIcon, CameraIcon, SendIcon, PhoneIcon } from '../../../components/Icons';
+import { BackIcon, CameraIcon, SendIcon, PhoneIcon, MoreIcon } from '../../../components/Icons';
 import type { Message } from '../../../types';
 
 export default function ChatConversationScreen() {
@@ -29,6 +29,52 @@ export default function ChatConversationScreen() {
   const chatMessages = messages[matchId] || [];
 
   const [text, setText] = useState('');
+  const [showReportMenu, setShowReportMenu] = useState(false);
+
+  const showActions = () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', 'Report User', 'Block User'], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+        (idx) => {
+          if (idx === 1) handleReport();
+          if (idx === 2) handleBlock();
+        }
+      );
+    } else {
+      setShowReportMenu(true);
+    }
+  };
+
+  const handleReport = () => {
+    Alert.alert('Report User', 'Why are you reporting this user?', [
+      { text: 'Spam', onPress: () => submitReport('spam') },
+      { text: 'Inappropriate', onPress: () => submitReport('inappropriate') },
+      { text: 'Harassment', onPress: () => submitReport('harassment') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const submitReport = async (reason: string) => {
+    try {
+      await api.report(id!, reason);
+      Alert.alert('Reported', 'Thanks for keeping frnds safe. We will review this.');
+    } catch {
+      Alert.alert('Reported', 'Thanks for keeping frnds safe.');
+    }
+  };
+
+  const handleBlock = () => {
+    Alert.alert('Block User', `Block ${profile?.displayName}? They won't be able to message you.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block', style: 'destructive', onPress: async () => {
+          try { await api.block(id!); } catch {}
+          Alert.alert('Blocked', `${profile?.displayName} has been blocked.`);
+          router.back();
+        },
+      },
+    ]);
+  };
 
   // Load messages from API and set up socket listeners
   useEffect(() => {
@@ -106,7 +152,7 @@ export default function ChatConversationScreen() {
           <BackIcon size={24} />
         </TouchableOpacity>
         <View style={styles.headerUser}>
-          <Avatar initials={profile?.avatar || '?'} size={40} />
+          <Avatar initials={profile?.avatar || '?'} size={40} photo={(profile as any)?.photo} />
           <View>
             <Text style={styles.headerName}>{profile?.displayName || 'User'}</Text>
             <Text style={[styles.headerStatus, { color: profile?.isOnline ? Colors.green : Colors.textMuted }]}>{profile?.isOnline ? 'Online' : 'Offline'}</Text>
@@ -118,6 +164,9 @@ export default function ChatConversationScreen() {
           </TouchableOpacity>
           <TouchableOpacity hitSlop={8} onPress={() => Alert.alert('Coming soon!', 'Voice calling will be available in a future update.')}>
             <PhoneIcon size={22} color={Colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={showActions}>
+            <MoreIcon size={22} color={Colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -154,6 +203,22 @@ export default function ChatConversationScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+      {/* Android Report Menu */}
+      <Modal visible={showReportMenu} transparent animationType="fade" onRequestClose={() => setShowReportMenu(false)}>
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowReportMenu(false)}>
+          <View style={styles.menuSheet}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowReportMenu(false); handleReport(); }}>
+              <Text style={styles.menuText}>Report User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowReportMenu(false); handleBlock(); }}>
+              <Text style={[styles.menuText, { color: Colors.red }]}>Block User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={() => setShowReportMenu(false)}>
+              <Text style={[styles.menuText, { color: Colors.textMuted }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -177,4 +242,8 @@ const styles = StyleSheet.create({
   input: { flex: 1, padding: 10, paddingHorizontal: 14, backgroundColor: Colors.bgInput, borderRadius: 20, color: Colors.text, fontSize: 14 },
   sendBtn: {},
   sendGradient: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  menuSheet: { backgroundColor: Colors.bgCard, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 8, paddingBottom: 30 },
+  menuItem: { padding: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  menuText: { fontSize: 16, fontWeight: '600', color: Colors.text },
 });

@@ -24,7 +24,7 @@ export default function ChatListScreen() {
       activeOpacity={0.7}
       onPress={() => router.push(`/(tabs)/chat/${item.user.id}`)}
     >
-      <Avatar initials={item.user.avatar} size={52} showOnline isOnline={item.user.isOnline} />
+      <Avatar initials={item.user.avatar} size={52} showOnline isOnline={item.user.isOnline} photo={item.user.photo} />
       <View style={styles.chatInfo}>
         <Text style={styles.chatName}>{item.user.displayName}</Text>
         <Text style={styles.chatLast} numberOfLines={1}>{item.lastMessage}</Text>
@@ -71,7 +71,7 @@ export default function ChatListScreen() {
                 style={styles.matchItem}
                 onPress={() => router.push(`/(tabs)/chat/${item.id}`)}
               >
-                <Avatar initials={item.avatar} size={60} borderColor={Colors.accent} gradient={item.gradient} />
+                <Avatar initials={item.avatar} size={60} borderColor={Colors.accent} gradient={item.gradient} photo={item.photo} />
                 <Text style={styles.matchName}>{item.displayName}</Text>
               </TouchableOpacity>
             )}

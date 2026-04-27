@@ -3,6 +3,25 @@ import type { User, SwipeProfile, ChatPreview, StoryGroup, Message } from '../ty
 import { generateProfiles, generateChats, generateStories, generateMessages, getRandomReply } from './mock-data';
 import { api, setToken, getToken, connectSocket, disconnectSocket, getSocket } from './api';
 
+// Normalize snake_case API responses to camelCase User objects
+function normalizeUser(u: any): User {
+  if (!u) return u;
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName || u.display_name || u.username || '',
+    avatar: u.avatar || (u.displayName || u.display_name || '??').substring(0, 2).toUpperCase(),
+    photo: u.photo || null,
+    photos: u.photos || [],
+    bio: u.bio || '',
+    age: u.age || 0,
+    interests: typeof u.interests === 'string' ? JSON.parse(u.interests) : (u.interests || []),
+    isOnline: !!(u.isOnline ?? u.is_online),
+    lastSeen: u.lastSeen || u.last_seen || new Date().toISOString(),
+    location: u.location,
+  };
+}
+
 // Auth Store
 interface AuthState {
   user: User | null;
@@ -24,28 +43,27 @@ export const useAuthStore = create<AuthState>((set) => ({
   hasOnboarded: false,
   loading: false,
   error: null,
-  signup: async (data) => {
+  signup: async (data: any) => {
     set({ loading: true, error: null });
     try {
       const res = await api.signup(data);
       setToken(res.token);
       connectSocket(res.token);
-      set({ user: res.user, isAuthenticated: true, loading: false });
-    } catch (err: any) {
-      console.warn('API signup failed, using mock fallback:', err.message);
-      // Mock fallback
-      const user: User = {
-        id: 'me',
-        username: data.username,
-        displayName: data.displayName,
-        avatar: data.displayName.substring(0, 2).toUpperCase(),
-        bio: 'New to frnds!',
-        age: data.age,
-        interests: data.interests,
-        isOnline: true,
-        lastSeen: new Date().toISOString(),
-      };
+      const user = normalizeUser(res.user);
+      // Upload photo if provided
+      if (data.photo) {
+        try {
+          await api.uploadPhoto(data.photo);
+          user.avatar = user.avatar; // keep initials
+          user.photo = data.photo;
+        } catch (e) {
+          console.warn('Photo upload failed:', e);
+        }
+      }
       set({ user, isAuthenticated: true, loading: false });
+    } catch (err: any) {
+      set({ loading: false, error: err.message || 'Signup failed. Check your connection.' });
+      throw err;
     }
   },
   login: async (data) => {
@@ -54,23 +72,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await api.login(data);
       setToken(res.token);
       connectSocket(res.token);
-      set({ user: res.user, isAuthenticated: true, loading: false });
+      set({ user: normalizeUser(res.user), isAuthenticated: true, loading: false });
     } catch (err: any) {
-      console.warn('API login failed, using mock fallback:', err.message);
-      // Mock fallback
-      const username = data.email.split('@')[0] || data.email;
-      const user: User = {
-        id: 'me',
-        username,
-        displayName: username,
-        avatar: username.substring(0, 2).toUpperCase(),
-        bio: 'Back on frnds!',
-        age: 21,
-        interests: ['music', 'gaming', 'travel'],
-        isOnline: true,
-        lastSeen: new Date().toISOString(),
-      };
-      set({ user, isAuthenticated: true, loading: false });
+      set({ loading: false, error: err.message || 'Login failed. Check your credentials.' });
+      throw err;
     }
   },
   loginLocal: (user) => set({ user, isAuthenticated: true }),
@@ -106,16 +111,16 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   loading: false,
   init: async () => {
     set({ loading: true });
-    if (!getToken()) {
-      // No auth token = mock mode, skip API
-      set({ profiles: generateProfiles(), currentIndex: 0, loading: false });
-      return;
-    }
     try {
       const res = await api.discover();
-      const profiles: SwipeProfile[] = (res.users || res).map((u: any) => ({
-        ...u,
-        gradient: u.gradient || ['#667eea', '#764ba2'] as const,
+      const rawUsers = Array.isArray(res) ? res : (res.users || []);
+      const gradients = [
+        ['#667eea', '#764ba2'], ['#2d1b69', '#11998e'], ['#4a1942', '#c74b50'],
+        ['#0f3443', '#34e89e'], ['#1a1a2e', '#e94560'], ['#16222a', '#3a6073'],
+      ] as const;
+      const profiles: SwipeProfile[] = rawUsers.map((u: any, i: number) => ({
+        ...normalizeUser(u),
+        gradient: gradients[i % gradients.length],
       }));
       set({ profiles, currentIndex: 0, loading: false });
     } catch (err) {
@@ -132,13 +137,13 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
 
     try {
       const res = await api.swipe(profile.id, direction);
-      if (res.match) {
+      if (res.matched || res.match) {
         matched = profile;
         set({ matches: [...matches, profile] });
       }
     } catch (err) {
-      console.warn('API swipe failed, using mock fallback:', err);
-      // Mock fallback: random match on like
+      console.warn('API swipe failed:', err);
+      // Offline mock: random match on like
       if (direction === 'like' && Math.random() > 0.5) {
         matched = profile;
         set({ matches: [...matches, profile] });
@@ -181,13 +186,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     try {
       const res = await api.getMatches();
-      const matches = res.matches || res;
-      const chats: ChatPreview[] = matches.map((m: any) => ({
-        matchId: m.id || m.matchId,
-        user: m.user || m,
-        lastMessage: m.lastMessage || 'You matched! Say hi',
-        lastMessageTime: m.lastMessageTime || 'now',
-        unreadCount: m.unreadCount || 0,
+      const matchList = Array.isArray(res) ? res : (res.matches || []);
+      const chats: ChatPreview[] = matchList.map((m: any) => ({
+        matchId: m.matchId || m.match_id || m.id,
+        user: normalizeUser(m.user || m),
+        lastMessage: m.lastMessage || m.last_message || 'You matched! Say hi',
+        lastMessageTime: m.lastMessageTime || m.last_message_time || 'now',
+        unreadCount: m.unreadCount || m.unread_count || 0,
       }));
       set({ chats, loading: false });
 

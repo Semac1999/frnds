@@ -49,6 +49,7 @@ const SCHEMA = `
     username TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
     avatar TEXT DEFAULT '',
+    photos TEXT DEFAULT '[]',
     bio TEXT DEFAULT '',
     age INTEGER NOT NULL CHECK (age >= 13),
     interests TEXT DEFAULT '[]',
@@ -107,6 +108,22 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_matches_user2 ON matches(user2_id);
   CREATE INDEX IF NOT EXISTS idx_messages_match ON messages(match_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_stories_user ON stories(user_id, expires_at);
+
+  CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    reporter_id TEXT NOT NULL REFERENCES users(id),
+    reported_id TEXT NOT NULL REFERENCES users(id),
+    reason TEXT NOT NULL,
+    details TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS blocks (
+    blocker_id TEXT NOT NULL REFERENCES users(id),
+    blocked_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (blocker_id, blocked_id)
+  );
 `;
 
 // ===== DEMO SEED DATA =====
@@ -149,6 +166,26 @@ export function seedDemoUsers(): { seeded: boolean; count: number } {
 
   console.log(`[database] Seeded ${DEMO_USERS.length} demo users`);
   return { seeded: true, count: DEMO_USERS.length };
+}
+
+export function formatUser(row: any): any {
+  if (!row) return null;
+  const avatarRaw = row.avatar || '';
+  const isPhotoAvatar = avatarRaw.startsWith('data:') || avatarRaw.startsWith('http');
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    avatar: isPhotoAvatar ? (row.display_name || '??').substring(0, 2).toUpperCase() : avatarRaw,
+    photo: isPhotoAvatar ? avatarRaw : null,
+    bio: row.bio || '',
+    age: row.age,
+    interests: typeof row.interests === 'string' ? JSON.parse(row.interests || '[]') : (row.interests || []),
+    photos: typeof row.photos === 'string' ? JSON.parse(row.photos || '[]') : (row.photos || []),
+    isOnline: !!row.is_online,
+    lastSeen: row.last_seen,
+    createdAt: row.created_at,
+  };
 }
 
 export async function initDatabase(): Promise<void> {

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import { query, queryOne, run } from '../lib/database';
+import { query, queryOne, run, formatUser } from '../lib/database';
 import { AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -47,13 +47,13 @@ router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
   `, [req.userId, req.userId, req.userId]);
 
   const result = matches.map((match: any) => {
-    const user: any = queryOne('SELECT id, username, display_name, avatar, bio, age, interests, is_online FROM users WHERE id = ?', [match.other_user_id]);
+    const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, is_online FROM users WHERE id = ?', [match.other_user_id]);
     const lastMsg: any = queryOne('SELECT content, created_at FROM messages WHERE match_id = ? ORDER BY created_at DESC LIMIT 1', [match.match_id]);
     const unread: any = queryOne('SELECT COUNT(*) as count FROM messages WHERE match_id = ? AND sender_id != ? AND read = 0', [match.match_id, req.userId]);
 
     return {
       matchId: match.match_id,
-      user: user ? { ...user, interests: JSON.parse(user.interests || '[]') } : null,
+      user: formatUser(user),
       lastMessage: lastMsg?.content || 'You matched! Say hi',
       lastMessageTime: lastMsg?.created_at || match.created_at,
       unreadCount: unread?.count || 0,

@@ -15,6 +15,7 @@ import userRoutes from './routes/users';
 import matchRoutes from './routes/matches';
 import chatRoutes from './routes/chat';
 import storyRoutes from './routes/stories';
+import reportRoutes from './routes/reports';
 
 async function main() {
   // Initialize sql.js database before anything else
@@ -30,11 +31,12 @@ async function main() {
 
   // Middleware
   app.use(cors({ origin: '*' }));
-  app.use(express.json());
+  app.use(express.json({ limit: '5mb' }));
 
   // Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
+  app.use('/api/users', reportRoutes);
   app.use('/api/swipes', matchRoutes); // POST /api/swipes for swiping
   app.use('/api/matches', matchRoutes); // GET /api/matches for match list
   app.use('/api/matches', chatRoutes);  // GET/POST /api/matches/:matchId/messages
