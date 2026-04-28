@@ -29,6 +29,8 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   hasOnboarded: boolean;
+  /** True only between successful signup and the welcome animation finishing. */
+  justSignedUp: boolean;
   loading: boolean;
   error: string | null;
   signup: (data: { email: string; password: string; username: string; displayName: string; age: number; interests: string[]; country?: string; photo?: string }) => Promise<void>;
@@ -36,6 +38,7 @@ interface AuthState {
   loginLocal: (user: User) => void;
   logout: () => Promise<void>;
   setOnboarded: () => void;
+  clearJustSignedUp: () => void;
   clearError: () => void;
 }
 
@@ -43,6 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   hasOnboarded: false,
+  justSignedUp: false,
   loading: false,
   error: null,
   signup: async (data: any) => {
@@ -62,7 +66,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           console.warn('Photo upload failed:', e);
         }
       }
-      set({ user, isAuthenticated: true, loading: false });
+      set({ user, isAuthenticated: true, loading: false, justSignedUp: true });
     } catch (err: any) {
       set({ loading: false, error: err.message || 'Signup failed. Check your connection.' });
       throw err;
@@ -92,6 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, isAuthenticated: false });
   },
   setOnboarded: () => set({ hasOnboarded: true }),
+  clearJustSignedUp: () => set({ justSignedUp: false }),
   clearError: () => set({ error: null }),
 }));
 

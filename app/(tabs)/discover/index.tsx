@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Alert,
+  Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Keyboard, Pressable,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, withTiming, interpolate } from 'react-native-reanimated';
@@ -13,6 +13,7 @@ import { useDiscoverStore, useAuthStore, useStoryStore } from '../../../lib/stor
 import { SwipeCard } from '../../../components/SwipeCard';
 import { MatchModal } from '../../../components/MatchModal';
 import { PaywallModal } from '../../../components/PaywallModal';
+import { WelcomeAnimation } from '../../../components/WelcomeAnimation';
 import { StoryCircle } from '../../../components/StoryCircle';
 import { SendIcon, DiscoverIcon, GlobeIcon, PinIcon } from '../../../components/Icons';
 import { getCountry } from '../../../constants/countries';
@@ -33,14 +34,24 @@ export default function DiscoverScreen() {
   const setScope = useDiscoverStore((s) => s.setScope);
 
   const currentUser = useAuthStore((s) => s.user);
+  const justSignedUp = useAuthStore((s) => s.justSignedUp);
+  const clearJustSignedUp = useAuthStore((s) => s.clearJustSignedUp);
   const storyGroups = useStoryStore((s) => s.storyGroups);
 
   const [matchedUser, setMatchedUser] = useState<SwipeProfile | null>(null);
   const [showMatch, setShowMatch] = useState(false);
   const [scopePickerOpen, setScopePickerOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
   const [sending, setSending] = useState(false);
+
+  // When a user just signed up, show the welcome animation once
+  useEffect(() => {
+    if (justSignedUp) {
+      setWelcomeOpen(true);
+    }
+  }, [justSignedUp]);
 
   const visibleProfiles = profiles.slice(currentIndex, currentIndex + 3);
   const topProfile = visibleProfiles[0];
@@ -69,27 +80,31 @@ export default function DiscoverScreen() {
   }, [currentUser?.isPremium, goBack]);
 
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-15, 15])
+    .minDistance(8)
+    .onStart(() => {
+      // Hide keyboard the moment user starts swiping
+      runOnJS(Keyboard.dismiss)();
+    })
     .onUpdate((e) => {
       translateX.value = e.translationX;
     })
     .onEnd((e) => {
       const dx = e.translationX;
-      if (dx < -SWIPE_THRESHOLD) {
-        // Left swipe → next profile
-        translateX.value = withTiming(-SCREEN_WIDTH * 1.4, { duration: 250 }, () => {
+      const vx = e.velocityX;
+      const isLeftSwipe = dx < -SWIPE_THRESHOLD || vx < -800;
+      const isRightSwipe = dx > SWIPE_THRESHOLD || vx > 800;
+
+      if (isLeftSwipe) {
+        translateX.value = withTiming(-SCREEN_WIDTH * 1.4, { duration: 220 }, () => {
           runOnJS(animateAndSkip)();
           translateX.value = 0;
         });
-      } else if (dx > SWIPE_THRESHOLD) {
-        // Right swipe → rewind (premium only)
+      } else if (isRightSwipe) {
         if (!currentUser?.isPremium) {
-          // Animate snap-back, then show paywall
           translateX.value = withSpring(0, { damping: 14, stiffness: 140 });
           runOnJS(setPaywallOpen)(true);
         } else {
-          translateX.value = withTiming(SCREEN_WIDTH * 1.4, { duration: 250 }, () => {
+          translateX.value = withTiming(SCREEN_WIDTH * 1.4, { duration: 220 }, () => {
             runOnJS(animateAndRewind)();
             translateX.value = 0;
           });
@@ -178,8 +193,8 @@ export default function DiscoverScreen() {
         </ScrollView>
       )}
 
-      {/* Card stack — wrapped in pan gesture */}
-      <View style={styles.cardStack}>
+      {/* Card stack — wrapped in pan gesture, tap dismisses keyboard */}
+      <Pressable style={styles.cardStack} onPress={Keyboard.dismiss}>
         {visibleProfiles.length > 0 ? (
           <>
             {/* Background cards (bottom of stack) */}
@@ -212,7 +227,7 @@ export default function DiscoverScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </Pressable>
 
       {/* Bottom: text input replaces the X + Send buttons */}
       {topProfile && (
@@ -248,7 +263,6 @@ export default function DiscoverScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-          <Text style={styles.swipeHint}>← swipe to skip   ·   swipe right to rewind</Text>
         </KeyboardAvoidingView>
       )}
 
@@ -299,6 +313,16 @@ export default function DiscoverScreen() {
           }
         }}
         onContinue={() => setShowMatch(false)}
+      />
+
+      {/* Welcome animation — plays once after signup */}
+      <WelcomeAnimation
+        visible={welcomeOpen}
+        displayName={currentUser?.displayName}
+        onDone={() => {
+          setWelcomeOpen(false);
+          clearJustSignedUp();
+        }}
       />
     </View>
   );
@@ -385,7 +409,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  swipeHint: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', backgroundColor: Colors.bgCard, paddingVertical: 4 },
 
   scopeOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   scopeSheet: {
