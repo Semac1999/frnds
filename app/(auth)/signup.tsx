@@ -40,6 +40,7 @@ export default function SignupScreen() {
   // Step 3 — photos
   const [photos, setPhotos] = useState<string[]>([]);
   const [editorOpen, setEditorOpen] = useState(false);
+  // PhotoEditor handles picking now — no signup-side picker needed
 
   const signup = useAuthStore((s) => s.signup);
   const loading = useAuthStore((s) => s.loading);

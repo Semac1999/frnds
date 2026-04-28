@@ -54,10 +54,11 @@ export function PhotoEditor({ visible, onClose, onSave, initialPhoto }: Props) {
       Alert.alert('Permission needed', 'Allow photo access to pick a picture.');
       return;
     }
+    // No allowsEditing — iOS forces a square crop tool when it's true,
+    // which is wrong for our portrait-first dating cards. We let users
+    // pick the full photo and crop to 9:16 visually via cover-fit.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [9, 16],
       quality: 0.5,
       base64: true,
     });

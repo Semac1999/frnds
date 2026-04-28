@@ -159,7 +159,10 @@ const DEMO_USERS = [
 ];
 
 // Reserved username for the welcome bot account.
-export const BOT_USERNAME = 'frnds_team';
+export const BOT_USERNAME = 'anna';
+
+// Stable portrait of a young woman from randomuser.me CDN — used for Anna's avatar
+const ANNA_PHOTO_URL = 'https://randomuser.me/api/portraits/women/65.jpg';
 
 /** Returns the bot user row, creating it on first call. */
 export function ensureBotUser(): { id: string; display_name: string } {
@@ -169,7 +172,18 @@ export function ensureBotUser(): { id: string; display_name: string } {
   const passwordHash = bcrypt.hashSync(crypto.randomUUID(), 10);
   run(
     `INSERT INTO users (id, email, password_hash, username, display_name, avatar, bio, age, interests, country, is_premium, is_online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)`,
-    [id, 'team@frnds.app', passwordHash, BOT_USERNAME, 'frnds team', '💜', 'Heyyy! We\'re the frnds team. Tap our chat to learn the ropes.', 99, JSON.stringify(['app', 'help', 'support']), '']
+    [
+      id,
+      'anna@frnds.app',
+      passwordHash,
+      BOT_USERNAME,
+      'Anna',
+      ANNA_PHOTO_URL, // formatUser will route URLs into the `photo` field automatically
+      "hey, i'm anna 💜 i help new people on frnds get the hang of things. dm me if u need anything!",
+      22,
+      JSON.stringify(['music', 'art', 'travel', 'memes']),
+      '',
+    ]
   );
   bot = queryOne('SELECT id, display_name FROM users WHERE username = ?', [BOT_USERNAME]);
   return bot;
@@ -193,12 +207,12 @@ export function createBotWelcome(userId: string, displayName: string): void {
     run('INSERT INTO matches (id, user1_id, user2_id) VALUES (?, ?, ?)', [matchId, u1, u2]);
   }
 
-  const firstName = (displayName || '').split(' ')[0] || 'friend';
+  const firstName = (displayName || '').split(' ')[0] || 'bestie';
   const messages = [
-    `hey ${firstName}! welcome to frnds 👋`,
-    `swipe left on the discover tab to skip, swipe right to rewind (frnds+).`,
-    `tap a card or type a message under it to start a chat — that's how all your conversations begin.`,
-    `we're so glad you're here. now go meet some people 💜`,
+    `hii ${firstName} 👋 i'm anna, welcome to frnds!`,
+    `quick rundown: on Discover, swipe left to skip ppl, swipe right to rewind (that one's frnds+ tho 🤫)`,
+    `to start chatting w/ someone, just type a msg under their pic and hit send. they'll get a request — if they accept it shows up here in chat 💌`,
+    `anyway hmu if u need anything — i'm always around. now go meet some cool ppl 💜`,
   ];
 
   // Only insert if no messages yet (prevents duplicates on re-invocation)

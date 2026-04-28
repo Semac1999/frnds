@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Keyboard, Pressable,
+  Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Keyboard,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, withTiming, interpolate } from 'react-native-reanimated';
@@ -80,7 +80,7 @@ export default function DiscoverScreen() {
   }, [currentUser?.isPremium, goBack]);
 
   const panGesture = Gesture.Pan()
-    .minDistance(8)
+    .minDistance(6)
     .onStart(() => {
       // Hide keyboard the moment user starts swiping
       runOnJS(Keyboard.dismiss)();
@@ -113,6 +113,16 @@ export default function DiscoverScreen() {
         translateX.value = withSpring(0, { damping: 14, stiffness: 140 });
       }
     });
+
+  // Tap on the card → dismiss keyboard. Loses the race to Pan as soon as
+  // the user moves > 5px, so it doesn't fight swipes.
+  const tapGesture = Gesture.Tap()
+    .maxDuration(250)
+    .maxDistance(5)
+    .onStart(() => { runOnJS(Keyboard.dismiss)(); });
+
+  // Race: whichever activates first wins. Pan needs movement, Tap needs none.
+  const cardGesture = Gesture.Race(panGesture, tapGesture);
 
   // Swipe-back hint overlay (right) — fades in when user starts swiping right
   const rewindHintStyle = useAnimatedStyle(() => ({
@@ -193,16 +203,16 @@ export default function DiscoverScreen() {
         </ScrollView>
       )}
 
-      {/* Card stack — wrapped in pan gesture, tap dismisses keyboard */}
-      <Pressable style={styles.cardStack} onPress={Keyboard.dismiss}>
+      {/* Card stack — pan/tap gestures live on the top card */}
+      <View style={styles.cardStack}>
         {visibleProfiles.length > 0 ? (
           <>
             {/* Background cards (bottom of stack) */}
             {visibleProfiles.slice(1).reverse().map((profile, i) => (
               <SwipeCard key={profile.id} profile={profile} stackIndex={visibleProfiles.length - 1 - i} />
             ))}
-            {/* Top card with gesture */}
-            <GestureDetector gesture={panGesture}>
+            {/* Top card with gesture (pan for swipes, tap for keyboard dismiss) */}
+            <GestureDetector gesture={cardGesture}>
               <Animated.View style={StyleSheet.absoluteFill}>
                 <SwipeCard profile={topProfile} isTop translateX={translateX} />
                 {/* Hint overlays */}
@@ -227,7 +237,7 @@ export default function DiscoverScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </Pressable>
+      </View>
 
       {/* Bottom: text input replaces the X + Send buttons */}
       {topProfile && (
