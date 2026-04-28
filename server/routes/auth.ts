@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { query, queryOne, run, formatUser } from '../lib/database';
+import { query, queryOne, run, formatUser, createBotWelcome } from '../lib/database';
 import { generateToken, AuthRequest, authMiddleware } from '../middleware/auth';
 
 const router = Router();
@@ -37,6 +37,9 @@ router.post('/signup', (req: AuthRequest, res: Response) => {
 
   const token = generateToken(id);
   const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online, created_at FROM users WHERE id = ?', [id]);
+
+  // Auto-create the welcome chat from the frnds team bot
+  try { createBotWelcome(id, displayName); } catch (e) { console.warn('Bot welcome failed', e); }
 
   res.status(201).json({ token, user: formatUser(user) });
 });
@@ -130,6 +133,8 @@ router.post('/google', async (req: AuthRequest, res: Response) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [id, email, passwordHash, username, displayName, picture || avatar, safeAge, JSON.stringify(interests || []), country || '']);
     user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online, created_at FROM users WHERE id = ?', [id]);
+    // Brand-new Google account → fire the welcome chat
+    try { createBotWelcome(id, displayName); } catch (e) { console.warn('Bot welcome failed', e); }
   } else {
     // Existing user — mark online
     run('UPDATE users SET is_online = 1 WHERE id = ?', [user.id]);

@@ -52,23 +52,26 @@ export const useAuthStore = create<AuthState>((set) => ({
   signup: async (data: any) => {
     set({ loading: true, error: null });
     try {
-      const res = await api.signup(data);
+      // Don't ship the photo with signup — keeps the request small and snappy.
+      const { photo, ...signupBody } = data;
+      const res = await api.signup(signupBody);
       setToken(res.token);
       connectSocket(res.token);
       const user = normalizeUser(res.user);
-      // Upload photo if provided
-      if (data.photo) {
+
+      // Upload photo as a separate request now that we're authenticated.
+      if (photo) {
         try {
-          await api.uploadPhoto(data.photo);
-          user.avatar = user.avatar; // keep initials
-          user.photo = data.photo;
+          await api.uploadPhoto(photo);
+          user.photo = photo;
         } catch (e) {
           console.warn('Photo upload failed:', e);
         }
       }
       set({ user, isAuthenticated: true, loading: false, justSignedUp: true });
     } catch (err: any) {
-      set({ loading: false, error: err.message || 'Signup failed. Check your connection.' });
+      const msg = err?.message || 'Signup failed. Check your connection.';
+      set({ loading: false, error: msg });
       throw err;
     }
   },

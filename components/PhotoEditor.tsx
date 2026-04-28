@@ -26,8 +26,10 @@ interface Props {
 
 export function PhotoEditor({ visible, onClose, onSave, initialPhoto }: Props) {
   const insets = useSafeAreaInsets();
-  const { width: SCREEN_WIDTH } = useWindowDimensions();
-  const editorSize = Math.min(SCREEN_WIDTH - 24, 360);
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  // Portrait 9:16 canvas
+  const editorWidth = Math.min(SCREEN_WIDTH - 24, 320);
+  const editorHeight = Math.min(SCREEN_HEIGHT * 0.55, (editorWidth * 16) / 9);
 
   const [photoUri, setPhotoUri] = useState<string | null>(initialPhoto || null);
   const [stickers, setStickers] = useState<PhotoSticker[]>([]);
@@ -55,8 +57,8 @@ export function PhotoEditor({ visible, onClose, onSave, initialPhoto }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.6,
+      aspect: [9, 16],
+      quality: 0.5,
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
@@ -157,13 +159,14 @@ export function PhotoEditor({ visible, onClose, onSave, initialPhoto }: Props) {
         ) : (
           <ScrollView contentContainerStyle={styles.scroll}>
             <TouchableOpacity activeOpacity={1} onPress={() => setSelectedId(null)}>
-              <View style={[styles.canvas, { width: editorSize, height: editorSize }]}>
-                <Image source={{ uri: photoUri }} style={{ width: editorSize, height: editorSize }} resizeMode="cover" />
+              <View style={[styles.canvas, { width: editorWidth, height: editorHeight }]}>
+                <Image source={{ uri: photoUri }} style={{ width: editorWidth, height: editorHeight }} resizeMode="cover" />
                 {stickers.map((s) => (
                   <DraggableSticker
                     key={s.id}
                     sticker={s}
-                    container={editorSize}
+                    containerWidth={editorWidth}
+                    containerHeight={editorHeight}
                     selected={s.id === selectedId}
                     onSelect={() => setSelectedId(s.id)}
                     onChange={(patch) => updateSticker(s.id, patch)}
@@ -243,30 +246,31 @@ export function PhotoEditor({ visible, onClose, onSave, initialPhoto }: Props) {
 }
 
 function DraggableSticker({
-  sticker, container, selected, onSelect, onChange,
+  sticker, containerWidth, containerHeight, selected, onSelect, onChange,
 }: {
   sticker: PhotoSticker;
-  container: number;
+  containerWidth: number;
+  containerHeight: number;
   selected: boolean;
   onSelect: () => void;
   onChange: (patch: Partial<PhotoSticker>) => void;
 }) {
-  const tx = useSharedValue(sticker.x * container);
-  const ty = useSharedValue(sticker.y * container);
+  const tx = useSharedValue(sticker.x * containerWidth);
+  const ty = useSharedValue(sticker.y * containerHeight);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
   React.useEffect(() => {
-    tx.value = sticker.x * container;
-    ty.value = sticker.y * container;
-  }, [sticker.x, sticker.y, container]);
+    tx.value = sticker.x * containerWidth;
+    ty.value = sticker.y * containerHeight;
+  }, [sticker.x, sticker.y, containerWidth, containerHeight]);
 
   const commitPosition = useCallback((x: number, y: number) => {
     onChange({
-      x: Math.max(0, Math.min(1, x / container)),
-      y: Math.max(0, Math.min(1, y / container)),
+      x: Math.max(0, Math.min(1, x / containerWidth)),
+      y: Math.max(0, Math.min(1, y / containerHeight)),
     });
-  }, [container, onChange]);
+  }, [containerWidth, containerHeight, onChange]);
 
   const tap = Gesture.Tap().onStart(() => { runOnJS(onSelect)(); });
   const pan = Gesture.Pan()
@@ -276,8 +280,8 @@ function DraggableSticker({
       runOnJS(onSelect)();
     })
     .onUpdate((e) => {
-      tx.value = Math.max(0, Math.min(container, startX.value + e.translationX));
-      ty.value = Math.max(0, Math.min(container, startY.value + e.translationY));
+      tx.value = Math.max(0, Math.min(containerWidth, startX.value + e.translationX));
+      ty.value = Math.max(0, Math.min(containerHeight, startY.value + e.translationY));
     })
     .onEnd(() => {
       runOnJS(commitPosition)(tx.value, ty.value);

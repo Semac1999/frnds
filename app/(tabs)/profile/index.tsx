@@ -11,7 +11,8 @@ import { InterestTag } from '../../../components/InterestTag';
 import { EditablePhoto } from '../../../components/EditablePhoto';
 import { PhotoEditor } from '../../../components/PhotoEditor';
 import { PaywallModal } from '../../../components/PaywallModal';
-import { EditIcon, SettingsIcon, ShieldIcon, PinIcon, PlusIcon, TrashIcon, StarIcon } from '../../../components/Icons';
+import { ProfilePreview } from '../../../components/ProfilePreview';
+import { EditIcon, SettingsIcon, ShieldIcon, PinIcon, PlusIcon, TrashIcon, StarIcon, DiscoverIcon } from '../../../components/Icons';
 import { COUNTRIES, getCountry } from '../../../constants/countries';
 
 const ALL_INTERESTS = ['music', 'gaming', 'sports', 'art', 'travel', 'food', 'movies', 'fitness', 'tech', 'fashion', 'photography', 'animals'];
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [photoEditorOpen, setPhotoEditorOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const stats = useMemo(() => ({
     likes: Math.floor(Math.random() * 50) + 10,
@@ -104,6 +106,23 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {/* Preview my profile button */}
+      <TouchableOpacity
+        style={styles.previewBtn}
+        onPress={() => setPreviewOpen(true)}
+        activeOpacity={0.85}
+        hitSlop={6}
+      >
+        <LinearGradient
+          colors={[...Gradients.primary]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.previewBtnInner}
+        >
+          <DiscoverIcon size={16} color="#fff" />
+          <Text style={styles.previewBtnText}>Preview my profile</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+
       {/* Stats */}
       <View style={styles.stats}>
         <View style={styles.stat}>
@@ -152,7 +171,7 @@ export default function ProfileScreen() {
             contentContainerStyle={{ gap: 10, paddingRight: 16 }}
             renderItem={({ item, index }) => (
               <View style={styles.galleryItem}>
-                <EditablePhoto value={item} size={120} radius={14} />
+                <EditablePhoto value={item} width={120} height={180} radius={14} />
                 <TouchableOpacity style={styles.galleryDelete} onPress={() => handleDeletePhoto(index)} hitSlop={6}>
                   <TrashIcon size={14} color="#fff" />
                 </TouchableOpacity>
@@ -276,6 +295,9 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Profile preview */}
+      <ProfilePreview visible={previewOpen} user={user} onClose={() => setPreviewOpen(false)} />
+
       {/* Paywall */}
       <PaywallModal visible={paywallOpen} onClose={() => setPaywallOpen(false)} />
 
@@ -336,6 +358,9 @@ const styles = StyleSheet.create({
   bio: { fontSize: 14, color: Colors.textSecondary, marginTop: 4, textAlign: 'center', maxWidth: 280 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
   locationText: { fontSize: 13, color: Colors.textSecondary },
+  previewBtn: { alignSelf: 'center', marginTop: 14, borderRadius: 999, overflow: 'hidden' },
+  previewBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10 },
+  previewBtnText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.3 },
   stats: { flexDirection: 'row', justifyContent: 'center', gap: 40, paddingVertical: 20 },
   stat: { alignItems: 'center' },
   statNum: { fontSize: 22, fontWeight: '800', color: Colors.primaryLight },

@@ -1,13 +1,17 @@
 import React, { useMemo } from 'react';
-import { View, Text, Image, StyleSheet, ViewStyle, ImageStyle, useWindowDimensions } from 'react-native';
+import { View, Text, Image, StyleSheet, ViewStyle, ImageStyle } from 'react-native';
 import { Colors } from '../constants/colors';
 import { decodeEditedPhoto, PhotoSticker } from '../lib/photo-format';
 
 interface Props {
   /** Raw photo string OR encoded edited-photo string (frnds:photo:v1:...) */
   value: string | null | undefined;
-  /** Width of the rendered photo (square). */
-  size: number;
+  /** Render width. */
+  width: number;
+  /** Render height. Defaults to width (square). */
+  height?: number;
+  /** @deprecated Use width/height. Kept for backwards compat. */
+  size?: number;
   style?: ViewStyle;
   imageStyle?: ImageStyle;
   /** If true, draws sticker overlays. Default true. */
@@ -16,40 +20,47 @@ interface Props {
   radius?: number;
 }
 
-const REFERENCE_WIDTH = 320;
+const REFERENCE_DIM = 320;
 
-export function EditablePhoto({ value, size, style, imageStyle, showStickers = true, radius = 16 }: Props) {
+export function EditablePhoto({ value, width, height, size, style, imageStyle, showStickers = true, radius = 16 }: Props) {
   const decoded = useMemo(() => decodeEditedPhoto(value || ''), [value]);
   const photoUri = decoded ? decoded.photo : (value || '');
   const stickers = decoded?.stickers || [];
 
+  // Backwards compat: `size` sets a square
+  const w = width ?? size ?? 0;
+  const h = height ?? size ?? width ?? 0;
+
   if (!photoUri) {
     return (
-      <View style={[styles.placeholder, { width: size, height: size, borderRadius: radius }, style]} />
+      <View style={[styles.placeholder, { width: w, height: h, borderRadius: radius }, style]} />
     );
   }
 
-  const scaleFactor = size / REFERENCE_WIDTH;
+  // Use the smaller dim as scale reference so stickers don't blow out on tall photos
+  const scaleFactor = Math.min(w, h) / REFERENCE_DIM;
 
   return (
-    <View style={[{ width: size, height: size, borderRadius: radius, overflow: 'hidden' }, style]}>
-      <Image source={{ uri: photoUri }} style={[{ width: size, height: size }, imageStyle]} resizeMode="cover" />
+    <View style={[{ width: w, height: h, borderRadius: radius, overflow: 'hidden' }, style]}>
+      <Image source={{ uri: photoUri }} style={[{ width: w, height: h }, imageStyle]} resizeMode="cover" />
       {showStickers && stickers.map((s) => (
-        <StickerView key={s.id} sticker={s} container={size} scale={scaleFactor} />
+        <StickerView key={s.id} sticker={s} containerWidth={w} containerHeight={h} scale={scaleFactor} />
       ))}
     </View>
   );
 }
 
-function StickerView({ sticker, container, scale }: { sticker: PhotoSticker; container: number; scale: number }) {
+function StickerView({
+  sticker, containerWidth, containerHeight, scale,
+}: { sticker: PhotoSticker; containerWidth: number; containerHeight: number; scale: number }) {
   const fontSize = Math.max(8, sticker.size * scale);
   return (
     <View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: sticker.x * container,
-        top: sticker.y * container,
+        left: sticker.x * containerWidth,
+        top: sticker.y * containerHeight,
         transform: [
           { translateX: -fontSize },
           { translateY: -fontSize / 2 },

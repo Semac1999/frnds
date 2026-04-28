@@ -158,11 +158,68 @@ const DEMO_USERS = [
   { username: 'mia_foster', displayName: 'Mia Foster', age: 18, country: 'BE', bio: 'Freshman vibes. I play guitar badly and make friendship bracelets really well.', interests: ['guitar', 'crafts', 'concerts', 'reading'] },
 ];
 
+// Reserved username for the welcome bot account.
+export const BOT_USERNAME = 'frnds_team';
+
+/** Returns the bot user row, creating it on first call. */
+export function ensureBotUser(): { id: string; display_name: string } {
+  let bot: any = queryOne('SELECT id, display_name FROM users WHERE username = ?', [BOT_USERNAME]);
+  if (bot) return bot;
+  const id = crypto.randomUUID();
+  const passwordHash = bcrypt.hashSync(crypto.randomUUID(), 10);
+  run(
+    `INSERT INTO users (id, email, password_hash, username, display_name, avatar, bio, age, interests, country, is_premium, is_online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)`,
+    [id, 'team@frnds.app', passwordHash, BOT_USERNAME, 'frnds team', '💜', 'Heyyy! We\'re the frnds team. Tap our chat to learn the ropes.', 99, JSON.stringify(['app', 'help', 'support']), '']
+  );
+  bot = queryOne('SELECT id, display_name FROM users WHERE username = ?', [BOT_USERNAME]);
+  return bot;
+}
+
+/**
+ * Creates a match between the bot and `userId`, plus a few intro messages.
+ * Idempotent — does nothing if a match already exists.
+ */
+export function createBotWelcome(userId: string, displayName: string): void {
+  const bot = ensureBotUser();
+  if (!bot) return;
+  const [u1, u2] = [bot.id, userId].sort();
+
+  const existing: any = queryOne('SELECT id FROM matches WHERE user1_id = ? AND user2_id = ?', [u1, u2]);
+  let matchId: string;
+  if (existing) {
+    matchId = existing.id;
+  } else {
+    matchId = crypto.randomUUID();
+    run('INSERT INTO matches (id, user1_id, user2_id) VALUES (?, ?, ?)', [matchId, u1, u2]);
+  }
+
+  const firstName = (displayName || '').split(' ')[0] || 'friend';
+  const messages = [
+    `hey ${firstName}! welcome to frnds 👋`,
+    `swipe left on the discover tab to skip, swipe right to rewind (frnds+).`,
+    `tap a card or type a message under it to start a chat — that's how all your conversations begin.`,
+    `we're so glad you're here. now go meet some people 💜`,
+  ];
+
+  // Only insert if no messages yet (prevents duplicates on re-invocation)
+  const existingMsg: any = queryOne('SELECT id FROM messages WHERE match_id = ? LIMIT 1', [matchId]);
+  if (existingMsg) return;
+
+  for (const content of messages) {
+    const id = crypto.randomUUID();
+    run('INSERT INTO messages (id, match_id, sender_id, content, type) VALUES (?, ?, ?, ?, ?)', [id, matchId, bot.id, content, 'text']);
+  }
+}
+
 export function seedDemoUsers(): { seeded: boolean; count: number } {
+  // Always ensure the bot exists so signup flow can rely on it.
+  ensureBotUser();
+
   const row = queryOne('SELECT COUNT(*) as count FROM users');
   const userCount = row?.count ?? 0;
 
-  if (userCount > 0) {
+  // We seeded the bot already, so 1 user means "no demo data yet".
+  if (userCount > 1) {
     return { seeded: false, count: userCount };
   }
 
@@ -179,8 +236,8 @@ export function seedDemoUsers(): { seeded: boolean; count: number } {
     );
   }
 
-  console.log(`[database] Seeded ${DEMO_USERS.length} demo users`);
-  return { seeded: true, count: DEMO_USERS.length };
+  console.log(`[database] Seeded ${DEMO_USERS.length} demo users + 1 bot`);
+  return { seeded: true, count: DEMO_USERS.length + 1 };
 }
 
 export function formatUser(row: any): any {
