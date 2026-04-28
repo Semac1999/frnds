@@ -72,4 +72,71 @@ router.post('/logout', authMiddleware, (req: AuthRequest, res: Response) => {
   res.json({ ok: true });
 });
 
+// POST /api/auth/google
+// Body: { idToken: string, age?: number, country?: string, interests?: string[] }
+// Verifies token with Google, finds-or-creates user, returns app JWT.
+router.post('/google', async (req: AuthRequest, res: Response) => {
+  const { idToken, age, country, interests } = req.body;
+  if (!idToken) return res.status(400).json({ error: 'idToken required' });
+
+  // Verify token with Google's tokeninfo endpoint (works server-side without extra deps)
+  let payload: any;
+  try {
+    const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!r.ok) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+    payload = await r.json();
+  } catch (e) {
+    return res.status(502).json({ error: 'Could not verify with Google' });
+  }
+
+  const expectedAud = process.env.GOOGLE_CLIENT_ID;
+  if (expectedAud && payload.aud && payload.aud !== expectedAud) {
+    // Allow multiple audiences (web/ios/android) by treating as comma-separated
+    const allowed = expectedAud.split(',').map((s) => s.trim());
+    if (!allowed.includes(payload.aud)) {
+      return res.status(401).json({ error: 'Token audience mismatch' });
+    }
+  }
+
+  const googleSub = payload.sub;
+  const email = (payload.email || '').toLowerCase();
+  const displayName = payload.name || (email ? email.split('@')[0] : 'New User');
+  const picture = payload.picture || null;
+  if (!googleSub || !email) {
+    return res.status(400).json({ error: 'Token missing required claims' });
+  }
+
+  // Find existing user by email
+  let user: any = queryOne('SELECT * FROM users WHERE email = ?', [email]);
+
+  if (!user) {
+    // Create a new user. Username: email local-part (de-duplicated).
+    const baseUsername = email.split('@')[0].replace(/[^a-z0-9_]/g, '').slice(0, 24) || 'user';
+    let username = baseUsername;
+    let n = 0;
+    while (queryOne('SELECT id FROM users WHERE username = ?', [username])) {
+      n += 1;
+      username = `${baseUsername}${n}`;
+    }
+    const id = randomId();
+    // Random password (Google users don't need it, but the schema requires one)
+    const passwordHash = bcrypt.hashSync(crypto.randomUUID(), 10);
+    const avatar = displayName.substring(0, 2).toUpperCase();
+    const safeAge = Math.max(13, parseInt(age, 10) || 18);
+    run(`
+      INSERT INTO users (id, email, password_hash, username, display_name, avatar, age, interests, country, is_online)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `, [id, email, passwordHash, username, displayName, picture || avatar, safeAge, JSON.stringify(interests || []), country || '']);
+    user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online, created_at FROM users WHERE id = ?', [id]);
+  } else {
+    // Existing user — mark online
+    run('UPDATE users SET is_online = 1 WHERE id = ?', [user.id]);
+  }
+
+  const token = generateToken(user.id);
+  res.json({ token, user: formatUser(user), googleSub });
+});
+
 export default router;

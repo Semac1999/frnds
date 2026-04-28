@@ -6,7 +6,6 @@ export default function ProfileLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.bg } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="settings" />
-      <Stack.Screen name="photo-editor" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

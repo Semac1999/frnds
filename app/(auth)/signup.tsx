@@ -7,6 +7,7 @@ import { Layout } from '../../constants/layout';
 import { GradientButton } from '../../components/GradientButton';
 import { InterestTag } from '../../components/InterestTag';
 import { CameraIcon, PinIcon } from '../../components/Icons';
+import { GoogleSignInButton } from '../../components/GoogleSignInButton';
 import { useAuthStore, useDiscoverStore, useChatStore, useStoryStore } from '../../lib/store';
 import { COUNTRIES, getCountry } from '../../constants/countries';
 
@@ -47,6 +48,10 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     if (!name.trim() || !username.trim() || !age.trim() || !email.trim() || !password.trim()) {
       Alert.alert('Missing info', 'Please fill in all fields');
+      return;
+    }
+    if (!photo) {
+      Alert.alert('Add a photo', 'Add a profile photo so people can recognise you. Tap the camera icon at the top.');
       return;
     }
     const ageNum = parseInt(age);
@@ -93,17 +98,25 @@ export default function SignupScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Profile Photo Picker */}
+      <GoogleSignInButton mode="signup" />
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or sign up with email</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      {/* Profile Photo Picker — required */}
       <TouchableOpacity style={styles.photoPicker} onPress={pickPhoto} activeOpacity={0.7}>
         {photo ? (
           <Image source={{ uri: photo }} style={styles.photoPreview} />
         ) : (
-          <View style={styles.photoPlaceholder}>
-            <CameraIcon size={32} color={Colors.textMuted} />
-            <Text style={styles.photoText}>Add Photo</Text>
+          <View style={[styles.photoPlaceholder, styles.photoRequired]}>
+            <CameraIcon size={32} color={Colors.primaryLight} />
+            <Text style={styles.photoTextRequired}>Add Photo</Text>
           </View>
         )}
       </TouchableOpacity>
+      <Text style={styles.photoHelp}>{photo ? 'Tap to change your photo' : 'A profile photo is required'}</Text>
 
       <View style={styles.inputGroup}>
         <TextInput style={styles.input} placeholder="Your name" placeholderTextColor={Colors.textMuted} value={name} onChangeText={setName} />
@@ -178,7 +191,10 @@ const styles = StyleSheet.create({
   photoPicker: { alignSelf: 'center', marginBottom: 20 },
   photoPreview: { width: 100, height: 100, borderRadius: 50 },
   photoPlaceholder: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.textMuted, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  photoRequired: { borderColor: Colors.primaryLight, backgroundColor: Colors.bgCard },
   photoText: { fontSize: 12, color: Colors.textMuted },
+  photoTextRequired: { fontSize: 12, color: Colors.primaryLight, fontWeight: '700' },
+  photoHelp: { textAlign: 'center', color: Colors.textMuted, fontSize: 12, marginBottom: 16, marginTop: -8 },
   tabs: { flexDirection: 'row', backgroundColor: Colors.bgCard, borderRadius: Layout.radius, padding: 4, marginBottom: 24 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12 },
   tabActive: { backgroundColor: Colors.primary },
@@ -212,4 +228,7 @@ const styles = StyleSheet.create({
   countryRowActive: { backgroundColor: Colors.bgCard },
   countryFlag: { fontSize: 22 },
   countryName: { color: Colors.text, fontSize: 15 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { color: Colors.textMuted, fontSize: 12 },
 });

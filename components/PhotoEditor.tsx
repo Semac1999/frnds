@@ -1,43 +1,50 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Alert, TextInput,
   ScrollView, Modal, useWindowDimensions, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Gradients } from '../../../constants/colors';
-import { BackIcon, TextIcon, TrashIcon, CheckIcon, PlusIcon } from '../../../components/Icons';
-import { api } from '../../../lib/api';
-import { useAuthStore } from '../../../lib/store';
-import { encodeEditedPhoto, PhotoSticker } from '../../../lib/photo-format';
+import { Colors, Gradients } from '../constants/colors';
+import { BackIcon, TextIcon, TrashIcon, PlusIcon } from './Icons';
+import { encodeEditedPhoto, PhotoSticker } from '../lib/photo-format';
 
 const EMOJI_PALETTE = ['😍', '🔥', '✨', '💜', '🌈', '🎉', '☀️', '🌙', '⭐', '💫', '📸', '🎵', '🍕', '☕', '🌸', '🦋', '🌊', '🏖️'];
 const COLOR_PALETTE = ['#ffffff', '#fd79a8', '#6C5CE7', '#fdcb6e', '#00b894', '#74b9ff', '#ff6b6b', '#000000'];
 
-type Mode = 'pick' | 'edit';
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  /** Called with an encoded photo string (raw or frnds:photo:v1:...) */
+  onSave: (encoded: string) => Promise<void> | void;
+  /** Optional: launch with this photo pre-loaded (skips the pick step) */
+  initialPhoto?: string | null;
+}
 
-export default function PhotoEditorScreen() {
+export function PhotoEditor({ visible, onClose, onSave, initialPhoto }: Props) {
   const insets = useSafeAreaInsets();
   const { width: SCREEN_WIDTH } = useWindowDimensions();
   const editorSize = Math.min(SCREEN_WIDTH - 24, 360);
 
-  const params = useLocalSearchParams<{ initial?: string }>();
-
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(initialPhoto || null);
   const [stickers, setStickers] = useState<PhotoSticker[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>('pick');
   const [textModalOpen, setTextModalOpen] = useState(false);
   const [textDraft, setTextDraft] = useState('');
   const [textColor, setTextColor] = useState('#ffffff');
   const [saving, setSaving] = useState(false);
 
-  const user = useAuthStore((s) => s.user);
-  const loginLocal = useAuthStore((s) => s.loginLocal);
+  // Reset on every open
+  React.useEffect(() => {
+    if (visible) {
+      setPhotoUri(initialPhoto || null);
+      setStickers([]);
+      setSelectedId(null);
+    }
+  }, [visible]);
 
   const pickPhoto = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -57,9 +64,17 @@ export default function PhotoEditorScreen() {
       const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
       setPhotoUri(uri);
       setStickers([]);
-      setMode('edit');
     }
   }, []);
+
+  // Auto-launch picker when opened with no photo
+  React.useEffect(() => {
+    if (visible && !photoUri && !initialPhoto) {
+      // Small delay so the modal is fully visible first
+      const t = setTimeout(() => pickPhoto(), 200);
+      return () => clearTimeout(t);
+    }
+  }, [visible]);
 
   const addEmoji = useCallback((emoji: string) => {
     const id = `s-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -94,151 +109,136 @@ export default function PhotoEditorScreen() {
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!photoUri) return;
+    if (!photoUri) {
+      Alert.alert('No photo', 'Pick a photo first.');
+      return;
+    }
     if (saving) return;
     setSaving(true);
     const encoded = stickers.length > 0
       ? encodeEditedPhoto({ photo: photoUri, stickers })
       : photoUri;
-
     try {
-      const updated = await api.addPhoto(encoded);
-      // Update local user with new photos array
-      if (user && updated?.photos) {
-        loginLocal({ ...user, photos: updated.photos });
-      }
+      await onSave(encoded);
       setSaving(false);
-      router.back();
     } catch (err: any) {
       setSaving(false);
       Alert.alert('Could not save', err?.message || 'Please try again');
     }
-  }, [photoUri, stickers, saving, user, loginLocal]);
-
-  // Pick mode: just an empty state with a button
-  if (mode === 'pick' || !photoUri) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-            <BackIcon size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Photo</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <View style={styles.pickBody}>
-          <Text style={styles.pickIcon}>📸</Text>
-          <Text style={styles.pickTitle}>Pick a photo to get creative</Text>
-          <Text style={styles.pickHint}>Add stickers, emojis, and your own text. Drag them anywhere on the photo.</Text>
-          <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85}>
-            <LinearGradient colors={[...Gradients.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pickBtn}>
-              <PlusIcon size={20} color="#fff" />
-              <Text style={styles.pickBtnText}>Choose Photo</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  }, [photoUri, stickers, saving, onSave]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
-          <BackIcon size={24} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Photo</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving} hitSlop={12}>
-          {saving ? <ActivityIndicator color={Colors.primaryLight} /> : <Text style={styles.saveBtn}>Save</Text>}
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <TouchableOpacity activeOpacity={1} onPress={() => setSelectedId(null)}>
-          <View style={[styles.canvas, { width: editorSize, height: editorSize }]}>
-            <Image source={{ uri: photoUri }} style={{ width: editorSize, height: editorSize }} resizeMode="cover" />
-            {stickers.map((s) => (
-              <DraggableSticker
-                key={s.id}
-                sticker={s}
-                container={editorSize}
-                selected={s.id === selectedId}
-                onSelect={() => setSelectedId(s.id)}
-                onChange={(patch) => updateSticker(s.id, patch)}
-              />
-            ))}
-          </View>
-        </TouchableOpacity>
-
-        {/* Toolbar */}
-        <View style={styles.toolbar}>
-          <TouchableOpacity style={styles.toolBtn} onPress={() => setTextModalOpen(true)}>
-            <TextIcon size={22} color={Colors.text} />
-            <Text style={styles.toolText}>Text</Text>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <BackIcon size={24} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.toolBtn} onPress={pickPhoto}>
-            <PlusIcon size={22} color={Colors.text} />
-            <Text style={styles.toolText}>Replace</Text>
+          <Text style={styles.headerTitle}>Edit Photo</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving || !photoUri} hitSlop={12}>
+            {saving ? <ActivityIndicator color={Colors.primaryLight} /> : (
+              <Text style={[styles.saveBtn, (!photoUri) && { opacity: 0.4 }]}>Save</Text>
+            )}
           </TouchableOpacity>
-          {selectedId ? (
-            <TouchableOpacity style={[styles.toolBtn, styles.toolBtnDanger]} onPress={deleteSelected}>
-              <TrashIcon size={22} color={Colors.red} />
-              <Text style={[styles.toolText, { color: Colors.red }]}>Delete</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
 
-        {/* Emoji palette */}
-        <Text style={styles.sectionLabel}>Stickers</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.palette}>
-          {EMOJI_PALETTE.map((e) => (
-            <TouchableOpacity key={e} style={styles.emojiBtn} onPress={() => addEmoji(e)} activeOpacity={0.7}>
-              <Text style={styles.emojiText}>{e}</Text>
+        {!photoUri ? (
+          <View style={styles.pickBody}>
+            <Text style={styles.pickIcon}>📸</Text>
+            <Text style={styles.pickTitle}>Pick a photo to get creative</Text>
+            <Text style={styles.pickHint}>Add stickers, emojis, and your own text. Drag them anywhere on the photo.</Text>
+            <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85}>
+              <LinearGradient colors={[...Gradients.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pickBtn}>
+                <PlusIcon size={20} color="#fff" />
+                <Text style={styles.pickBtnText}>Choose Photo</Text>
+              </LinearGradient>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scroll}>
+            <TouchableOpacity activeOpacity={1} onPress={() => setSelectedId(null)}>
+              <View style={[styles.canvas, { width: editorSize, height: editorSize }]}>
+                <Image source={{ uri: photoUri }} style={{ width: editorSize, height: editorSize }} resizeMode="cover" />
+                {stickers.map((s) => (
+                  <DraggableSticker
+                    key={s.id}
+                    sticker={s}
+                    container={editorSize}
+                    selected={s.id === selectedId}
+                    onSelect={() => setSelectedId(s.id)}
+                    onChange={(patch) => updateSticker(s.id, patch)}
+                  />
+                ))}
+              </View>
+            </TouchableOpacity>
 
-        {/* Selected sticker controls */}
-        {selectedId ? <SizeControls stickers={stickers} selectedId={selectedId} onChange={updateSticker} /> : null}
+            <View style={styles.toolbar}>
+              <TouchableOpacity style={styles.toolBtn} onPress={() => setTextModalOpen(true)}>
+                <TextIcon size={22} color={Colors.text} />
+                <Text style={styles.toolText}>Text</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.toolBtn} onPress={pickPhoto}>
+                <PlusIcon size={22} color={Colors.text} />
+                <Text style={styles.toolText}>Replace</Text>
+              </TouchableOpacity>
+              {selectedId ? (
+                <TouchableOpacity style={[styles.toolBtn, styles.toolBtnDanger]} onPress={deleteSelected}>
+                  <TrashIcon size={22} color={Colors.red} />
+                  <Text style={[styles.toolText, { color: Colors.red }]}>Delete</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
-        <Text style={styles.tip}>Tip: tap a sticker to select, then drag to move.</Text>
-      </ScrollView>
-
-      {/* Text input modal */}
-      <Modal visible={textModalOpen} transparent animationType="fade" onRequestClose={() => setTextModalOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Add text</Text>
-            <TextInput
-              style={[styles.modalInput, { color: textColor }]}
-              placeholder="Type something fun…"
-              placeholderTextColor={Colors.textMuted}
-              value={textDraft}
-              onChangeText={setTextDraft}
-              autoFocus
-              maxLength={40}
-            />
-            <View style={styles.colorRow}>
-              {COLOR_PALETTE.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.colorDot, { backgroundColor: c }, textColor === c && styles.colorDotActive]}
-                  onPress={() => setTextColor(c)}
-                />
+            <Text style={styles.sectionLabel}>Stickers</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.palette}>
+              {EMOJI_PALETTE.map((e) => (
+                <TouchableOpacity key={e} style={styles.emojiBtn} onPress={() => addEmoji(e)} activeOpacity={0.7}>
+                  <Text style={styles.emojiText}>{e}</Text>
+                </TouchableOpacity>
               ))}
-            </View>
-            <View style={styles.modalRow}>
-              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnGhost]} onPress={() => setTextModalOpen(false)}>
-                <Text style={styles.modalBtnGhostText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={addText}>
-                <Text style={styles.modalBtnPrimaryText}>Add</Text>
-              </TouchableOpacity>
+            </ScrollView>
+
+            {selectedId ? <SizeControls stickers={stickers} selectedId={selectedId} onChange={updateSticker} /> : null}
+
+            <Text style={styles.tip}>Tip: tap a sticker to select, then drag to move.</Text>
+          </ScrollView>
+        )}
+
+        <Modal visible={textModalOpen} transparent animationType="fade" onRequestClose={() => setTextModalOpen(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>Add text</Text>
+              <TextInput
+                style={[styles.modalInput, { color: textColor }]}
+                placeholder="Type something fun…"
+                placeholderTextColor={Colors.textMuted}
+                value={textDraft}
+                onChangeText={setTextDraft}
+                autoFocus
+                maxLength={40}
+              />
+              <View style={styles.colorRow}>
+                {COLOR_PALETTE.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorDot, { backgroundColor: c }, textColor === c && styles.colorDotActive]}
+                    onPress={() => setTextColor(c)}
+                  />
+                ))}
+              </View>
+              <View style={styles.modalRow}>
+                <TouchableOpacity style={[styles.modalBtn, styles.modalBtnGhost]} onPress={() => setTextModalOpen(false)}>
+                  <Text style={styles.modalBtnGhostText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={addText}>
+                  <Text style={styles.modalBtnPrimaryText}>Add</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </Modal>
   );
 }
 
@@ -256,7 +256,6 @@ function DraggableSticker({
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
-  // Keep shared values in sync if external state changes
   React.useEffect(() => {
     tx.value = sticker.x * container;
     ty.value = sticker.y * container;
@@ -270,7 +269,6 @@ function DraggableSticker({
   }, [container, onChange]);
 
   const tap = Gesture.Tap().onStart(() => { runOnJS(onSelect)(); });
-
   const pan = Gesture.Pan()
     .onStart(() => {
       startX.value = tx.value;
@@ -348,87 +346,39 @@ function SizeControls({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 10,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   headerTitle: { color: Colors.text, fontSize: 17, fontWeight: '700' },
   saveBtn: { color: Colors.primaryLight, fontWeight: '700', fontSize: 15 },
   scroll: { padding: 12, alignItems: 'center', paddingBottom: 60 },
-
   pickBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   pickIcon: { fontSize: 56 },
   pickTitle: { color: Colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   pickHint: { color: Colors.textMuted, textAlign: 'center', maxWidth: 300, marginBottom: 12 },
-  pickBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 24, paddingVertical: 14, borderRadius: 999,
-  },
+  pickBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 999 },
   pickBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  canvas: {
-    backgroundColor: Colors.bgElevated,
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  toolbar: {
-    flexDirection: 'row',
-    gap: 10,
-    marginVertical: 10,
-  },
-  toolBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.bgCard,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
+  canvas: { backgroundColor: Colors.bgElevated, borderRadius: 18, overflow: 'hidden', marginBottom: 12 },
+  toolbar: { flexDirection: 'row', gap: 10, marginVertical: 10 },
+  toolBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   toolBtnDanger: { borderColor: Colors.red },
   toolText: { color: Colors.text, fontWeight: '700', fontSize: 13 },
-
   sectionLabel: { alignSelf: 'flex-start', color: Colors.textMuted, fontWeight: '700', fontSize: 12, marginTop: 12, marginBottom: 6, letterSpacing: 0.5 },
   palette: { gap: 8, paddingVertical: 4 },
-  emojiBtn: {
-    width: 46, height: 46,
-    backgroundColor: Colors.bgCard,
-    borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: Colors.border,
-  },
+  emojiBtn: { width: 46, height: 46, backgroundColor: Colors.bgCard, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
   emojiText: { fontSize: 24 },
-
   controlsRow: { width: '100%', alignItems: 'flex-start' },
   controlsButtons: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  controlBtn: {
-    paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: Colors.bgCard, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.border,
-  },
+  controlBtn: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: Colors.bgCard, borderRadius: 10, borderWidth: 1, borderColor: Colors.border },
   controlText: { color: Colors.text, fontWeight: '700' },
   tip: { marginTop: 14, color: Colors.textMuted, fontSize: 12, textAlign: 'center' },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalSheet: { width: '100%', backgroundColor: Colors.bgCard, borderRadius: 16, padding: 16, gap: 12, borderWidth: 1, borderColor: Colors.border },
   modalTitle: { color: Colors.text, fontSize: 17, fontWeight: '700' },
-  modalInput: {
-    backgroundColor: Colors.bgInput,
-    padding: 12, borderRadius: 10,
-    fontSize: 18, fontWeight: '700',
-  },
+  modalInput: { backgroundColor: Colors.bgInput, padding: 12, borderRadius: 10, fontSize: 18, fontWeight: '700' },
   colorRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  colorDot: {
-    width: 28, height: 28, borderRadius: 14,
-    borderWidth: 2, borderColor: Colors.border,
-  },
+  colorDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: Colors.border },
   colorDotActive: { borderColor: Colors.primary, borderWidth: 3 },
   modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
   modalBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },

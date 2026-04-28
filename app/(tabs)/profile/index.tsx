@@ -9,7 +9,8 @@ import { api } from '../../../lib/api';
 import { Avatar } from '../../../components/Avatar';
 import { InterestTag } from '../../../components/InterestTag';
 import { EditablePhoto } from '../../../components/EditablePhoto';
-import { EditIcon, SettingsIcon, ShieldIcon, LocationIcon, PinIcon, PlusIcon, TrashIcon } from '../../../components/Icons';
+import { PhotoEditor } from '../../../components/PhotoEditor';
+import { EditIcon, SettingsIcon, ShieldIcon, PinIcon, PlusIcon, TrashIcon } from '../../../components/Icons';
 import { COUNTRIES, getCountry } from '../../../constants/countries';
 
 const ALL_INTERESTS = ['music', 'gaming', 'sports', 'art', 'travel', 'food', 'movies', 'fitness', 'tech', 'fashion', 'photography', 'animals'];
@@ -27,6 +28,7 @@ export default function ProfileScreen() {
   const [editInterests, setEditInterests] = useState<string[]>([]);
   const [editCountry, setEditCountry] = useState<string>('');
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [photoEditorOpen, setPhotoEditorOpen] = useState(false);
 
   const stats = useMemo(() => ({
     likes: Math.floor(Math.random() * 50) + 10,
@@ -122,7 +124,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>My photos & videos ({photos.length})</Text>
           <TouchableOpacity
             style={styles.addPhotoBtn}
-            onPress={() => router.push('/(tabs)/profile/photo-editor')}
+            onPress={() => setPhotoEditorOpen(true)}
             disabled={photos.length >= 6}
             activeOpacity={0.8}
           >
@@ -133,7 +135,7 @@ export default function ProfileScreen() {
         {photos.length === 0 ? (
           <TouchableOpacity
             style={styles.galleryEmpty}
-            onPress={() => router.push('/(tabs)/profile/photo-editor')}
+            onPress={() => setPhotoEditorOpen(true)}
             activeOpacity={0.85}
           >
             <PlusIcon size={28} color={Colors.textMuted} />
@@ -244,6 +246,23 @@ export default function ProfileScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Photo Editor */}
+      <PhotoEditor
+        visible={photoEditorOpen}
+        onClose={() => setPhotoEditorOpen(false)}
+        onSave={async (encoded) => {
+          try {
+            const updated = await api.addPhoto(encoded);
+            if (updated?.photos) {
+              loginLocal({ ...user, photos: updated.photos });
+            }
+            setPhotoEditorOpen(false);
+          } catch (err: any) {
+            Alert.alert('Could not save', err?.message || 'Try again');
+          }
+        }}
+      />
 
       {/* Country Picker */}
       <Modal visible={countryPickerOpen} animationType="slide" presentationStyle="pageSheet">
