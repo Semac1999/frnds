@@ -5,7 +5,8 @@
       "name": "frnds-app",
       "runtimeExecutable": "node",
       "runtimeArgs": ["G:/AI/frnds/start-web.js"],
-      "port": 8081
+      "port": 8081,
+      "autoPort": false
     }
   ]
 }

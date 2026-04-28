@@ -30,7 +30,15 @@ export function TabBar({ state, descriptors, navigation }: Props) {
         const color = isFocused ? Colors.primaryLight : Colors.textMuted;
 
         const onPress = () => {
-          if (!isFocused) {
+          if (isFocused) {
+            // Already on this tab — pop the inner stack back to its root
+            // so e.g. tapping Profile while inside Settings goes to the main profile.
+            const route = tab.route;
+            const innerState = route?.state;
+            if (innerState && Array.isArray(innerState.routes) && innerState.routes.length > 1) {
+              navigation.navigate(route.name, { screen: innerState.routes[0].name });
+            }
+          } else {
             navigation.navigate(tab.route.name);
           }
         };
