@@ -47,7 +47,7 @@ router.get('/', authMiddleware, (req: AuthRequest, res: Response) => {
   `, [req.userId, req.userId, req.userId]);
 
   const result = matches.map((match: any) => {
-    const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online FROM users WHERE id = ?', [match.other_user_id]);
+    const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [match.other_user_id]);
     const lastMsg: any = queryOne('SELECT content, created_at FROM messages WHERE match_id = ? ORDER BY created_at DESC LIMIT 1', [match.match_id]);
     const unread: any = queryOne('SELECT COUNT(*) as count FROM messages WHERE match_id = ? AND sender_id != ? AND read = 0', [match.match_id, req.userId]);
 

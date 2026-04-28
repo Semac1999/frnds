@@ -10,7 +10,8 @@ import { Avatar } from '../../../components/Avatar';
 import { InterestTag } from '../../../components/InterestTag';
 import { EditablePhoto } from '../../../components/EditablePhoto';
 import { PhotoEditor } from '../../../components/PhotoEditor';
-import { EditIcon, SettingsIcon, ShieldIcon, PinIcon, PlusIcon, TrashIcon } from '../../../components/Icons';
+import { PaywallModal } from '../../../components/PaywallModal';
+import { EditIcon, SettingsIcon, ShieldIcon, PinIcon, PlusIcon, TrashIcon, StarIcon } from '../../../components/Icons';
 import { COUNTRIES, getCountry } from '../../../constants/countries';
 
 const ALL_INTERESTS = ['music', 'gaming', 'sports', 'art', 'travel', 'food', 'movies', 'fitness', 'tech', 'fashion', 'photography', 'animals'];
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const [editCountry, setEditCountry] = useState<string>('');
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [photoEditorOpen, setPhotoEditorOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const stats = useMemo(() => ({
     likes: Math.floor(Math.random() * 50) + 10,
@@ -175,21 +177,48 @@ export default function ProfileScreen() {
       {/* Menu */}
       <View style={styles.section}>
         <View style={styles.settingsList}>
-          <TouchableOpacity style={styles.settingsItem} onPress={openEdit}>
+          {!user.isPremium && (
+            <TouchableOpacity
+              style={[styles.settingsItem, styles.premiumItem]}
+              onPress={() => setPaywallOpen(true)}
+              activeOpacity={0.7}
+              hitSlop={4}
+            >
+              <StarIcon size={20} color={Colors.gold} filled />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.premiumText}>Upgrade to frnds+</Text>
+                <Text style={styles.premiumSub}>Rewind, unlimited matches & more</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          {user.isPremium && (
+            <View style={[styles.settingsItem, styles.premiumActive]}>
+              <StarIcon size={20} color={Colors.gold} filled />
+              <Text style={styles.premiumActiveText}>frnds+ active</Text>
+            </View>
+          )}
+          <TouchableOpacity style={styles.settingsItem} onPress={openEdit} activeOpacity={0.7} hitSlop={4}>
             <EditIcon size={20} color={Colors.textSecondary} />
             <Text style={styles.settingsText}>Edit Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.settingsItem} onPress={() => router.push('/(tabs)/profile/settings')}>
+          <TouchableOpacity style={styles.settingsItem} onPress={() => router.push('/(tabs)/profile/settings')} activeOpacity={0.7} hitSlop={4}>
             <SettingsIcon size={20} color={Colors.textSecondary} />
             <Text style={styles.settingsText}>Settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.settingsItem} onPress={() => Alert.alert('Safety', 'Our team reviews all reports within 24 hours. Use the report button in any chat to flag a user.')}>
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => Alert.alert('Safety', 'Our team reviews all reports within 24 hours. Use the report button in any chat to flag a user.')}
+            activeOpacity={0.7}
+            hitSlop={4}
+          >
             <ShieldIcon size={20} color={Colors.textSecondary} />
             <Text style={styles.settingsText}>Safety Center</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.settingsItem}
             onPress={() => { logout(); router.replace('/(auth)/onboarding'); }}
+            activeOpacity={0.7}
+            hitSlop={4}
           >
             <Text style={[styles.settingsText, { color: Colors.red }]}>Log Out</Text>
           </TouchableOpacity>
@@ -246,6 +275,9 @@ export default function ProfileScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Paywall */}
+      <PaywallModal visible={paywallOpen} onClose={() => setPaywallOpen(false)} />
 
       {/* Photo Editor */}
       <PhotoEditor
@@ -333,8 +365,13 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   muted: { color: Colors.textMuted, fontSize: 13 },
   settingsList: { gap: 4 },
-  settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, paddingHorizontal: 16, backgroundColor: Colors.bgCard, borderRadius: 10 },
-  settingsText: { fontSize: 15, color: Colors.text },
+  settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingHorizontal: 16, backgroundColor: Colors.bgCard, borderRadius: 10 },
+  settingsText: { fontSize: 15, color: Colors.text, flex: 1 },
+  premiumItem: { backgroundColor: 'rgba(253, 203, 110, 0.08)', borderWidth: 1, borderColor: 'rgba(253, 203, 110, 0.4)' },
+  premiumText: { fontSize: 15, color: Colors.gold, fontWeight: '700' },
+  premiumSub: { fontSize: 12, color: Colors.textMuted, marginTop: 1 },
+  premiumActive: { backgroundColor: 'rgba(253, 203, 110, 0.12)', borderWidth: 1, borderColor: Colors.gold },
+  premiumActiveText: { fontSize: 15, color: Colors.gold, fontWeight: '700', flex: 1 },
   editContainer: { flex: 1, backgroundColor: Colors.bg },
   editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.border },
   editTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },

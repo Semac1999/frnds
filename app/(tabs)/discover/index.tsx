@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions,
   Modal, TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, withTiming, interpolate } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -10,24 +12,35 @@ import { Colors, Gradients } from '../../../constants/colors';
 import { useDiscoverStore, useAuthStore, useStoryStore } from '../../../lib/store';
 import { SwipeCard } from '../../../components/SwipeCard';
 import { MatchModal } from '../../../components/MatchModal';
+import { PaywallModal } from '../../../components/PaywallModal';
 import { StoryCircle } from '../../../components/StoryCircle';
-import { CloseIcon, SendIcon, DiscoverIcon, GlobeIcon, PinIcon } from '../../../components/Icons';
+import { SendIcon, DiscoverIcon, GlobeIcon, PinIcon } from '../../../components/Icons';
 import { getCountry } from '../../../constants/countries';
 import type { SwipeProfile } from '../../../types';
 
 export default function DiscoverScreen() {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
+  const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.28;
   const insets = useSafeAreaInsets();
-  const { profiles, currentIndex, sendRequest, skip, init, scope, setScope } = useDiscoverStore();
+
+  const profiles = useDiscoverStore((s) => s.profiles);
+  const currentIndex = useDiscoverStore((s) => s.currentIndex);
+  const sendRequest = useDiscoverStore((s) => s.sendRequest);
+  const skip = useDiscoverStore((s) => s.skip);
+  const goBack = useDiscoverStore((s) => s.goBack);
+  const init = useDiscoverStore((s) => s.init);
+  const scope = useDiscoverStore((s) => s.scope);
+  const setScope = useDiscoverStore((s) => s.setScope);
+
   const currentUser = useAuthStore((s) => s.user);
   const storyGroups = useStoryStore((s) => s.storyGroups);
 
   const [matchedUser, setMatchedUser] = useState<SwipeProfile | null>(null);
   const [showMatch, setShowMatch] = useState(false);
-  const [composing, setComposing] = useState(false);
+  const [scopePickerOpen, setScopePickerOpen] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
   const [draftMessage, setDraftMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [scopePickerOpen, setScopePickerOpen] = useState(false);
 
   const visibleProfiles = profiles.slice(currentIndex, currentIndex + 3);
   const topProfile = visibleProfiles[0];
@@ -39,22 +52,70 @@ export default function DiscoverScreen() {
     }
   }, [currentIndex, profiles.length]);
 
-  const openCompose = useCallback(() => {
-    if (!topProfile) return;
-    setDraftMessage('');
-    setComposing(true);
-  }, [topProfile]);
+  // ===== Swipe gestures =====
+  const translateX = useSharedValue(0);
 
+  const animateAndSkip = useCallback(() => {
+    skip();
+    setDraftMessage('');
+  }, [skip]);
+
+  const animateAndRewind = useCallback(() => {
+    if (!currentUser?.isPremium) {
+      setPaywallOpen(true);
+      return;
+    }
+    goBack();
+  }, [currentUser?.isPremium, goBack]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-15, 15])
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      const dx = e.translationX;
+      if (dx < -SWIPE_THRESHOLD) {
+        // Left swipe → next profile
+        translateX.value = withTiming(-SCREEN_WIDTH * 1.4, { duration: 250 }, () => {
+          runOnJS(animateAndSkip)();
+          translateX.value = 0;
+        });
+      } else if (dx > SWIPE_THRESHOLD) {
+        // Right swipe → rewind (premium only)
+        if (!currentUser?.isPremium) {
+          // Animate snap-back, then show paywall
+          translateX.value = withSpring(0, { damping: 14, stiffness: 140 });
+          runOnJS(setPaywallOpen)(true);
+        } else {
+          translateX.value = withTiming(SCREEN_WIDTH * 1.4, { duration: 250 }, () => {
+            runOnJS(animateAndRewind)();
+            translateX.value = 0;
+          });
+        }
+      } else {
+        translateX.value = withSpring(0, { damping: 14, stiffness: 140 });
+      }
+    });
+
+  // Swipe-back hint overlay (right) — fades in when user starts swiping right
+  const rewindHintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1]),
+  }));
+  const skipHintStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0]),
+  }));
+
+  // ===== Send message =====
   const handleSend = useCallback(async () => {
     const content = draftMessage.trim();
-    if (!content) return;
-    if (sending) return;
+    if (!content || sending || !topProfile) return;
     setSending(true);
     try {
       const profile = topProfile;
       const res = await sendRequest(content);
       setSending(false);
-      setComposing(false);
       setDraftMessage('');
       if (res?.matched && profile) {
         setMatchedUser(profile);
@@ -66,16 +127,11 @@ export default function DiscoverScreen() {
     }
   }, [draftMessage, sending, sendRequest, topProfile]);
 
-  const handleSkip = () => {
-    skip();
-  };
-
+  // ===== Scope picker =====
   const handleSelectScope = async (newScope: 'world' | 'country') => {
     setScopePickerOpen(false);
     if (newScope === 'country' && !currentUser?.country) {
-      Alert.alert('Set your country', 'Add your country to your profile to use this filter.', [
-        { text: 'OK' },
-      ]);
+      Alert.alert('Set your country', 'Add your country to your profile to use this filter.', [{ text: 'OK' }]);
       return;
     }
     if (newScope !== scope) {
@@ -94,13 +150,14 @@ export default function DiscoverScreen() {
           style={styles.scopeBtn}
           onPress={() => setScopePickerOpen(true)}
           activeOpacity={0.8}
+          hitSlop={8}
         >
           {scope === 'country' ? <PinIcon size={14} color={Colors.text} /> : <GlobeIcon size={14} color={Colors.text} />}
           <Text style={styles.scopeText} numberOfLines={1}>{scopeLabel}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Compact Stories Bar */}
+      {/* Compact stories */}
       {storyGroups.length > 0 && (
         <ScrollView
           horizontal
@@ -121,31 +178,34 @@ export default function DiscoverScreen() {
         </ScrollView>
       )}
 
-      {/* Card Stack */}
+      {/* Card stack — wrapped in pan gesture */}
       <View style={styles.cardStack}>
         {visibleProfiles.length > 0 ? (
-          visibleProfiles.map((profile, i) => {
-            const isTop = i === 0;
-            if (isTop) {
-              return (
-                <TouchableOpacity
-                  key={profile.id}
-                  style={StyleSheet.absoluteFill}
-                  activeOpacity={0.95}
-                  onPress={openCompose}
-                >
-                  <SwipeCard profile={profile} isTop />
-                </TouchableOpacity>
-              );
-            }
-            return <SwipeCard key={profile.id} profile={profile} stackIndex={i} />;
-          }).reverse()
+          <>
+            {/* Background cards (bottom of stack) */}
+            {visibleProfiles.slice(1).reverse().map((profile, i) => (
+              <SwipeCard key={profile.id} profile={profile} stackIndex={visibleProfiles.length - 1 - i} />
+            ))}
+            {/* Top card with gesture */}
+            <GestureDetector gesture={panGesture}>
+              <Animated.View style={StyleSheet.absoluteFill}>
+                <SwipeCard profile={topProfile} isTop translateX={translateX} />
+                {/* Hint overlays */}
+                <Animated.View pointerEvents="none" style={[styles.hint, styles.hintLeft, skipHintStyle]}>
+                  <Text style={styles.hintText}>SKIP</Text>
+                </Animated.View>
+                <Animated.View pointerEvents="none" style={[styles.hint, styles.hintRight, rewindHintStyle]}>
+                  <Text style={styles.hintText}>{currentUser?.isPremium ? 'REWIND' : 'frnds+'}</Text>
+                </Animated.View>
+              </Animated.View>
+            </GestureDetector>
+          </>
         ) : (
           <View style={styles.empty}>
             <DiscoverIcon size={60} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>No more people nearby</Text>
             <Text style={styles.emptyText}>
-              {scope === 'country' ? 'Try switching to Worldwide for more matches.' : 'Check back later for new frnds!'}
+              {scope === 'country' ? 'Try Worldwide for more matches.' : 'Check back later for new frnds!'}
             </Text>
             <TouchableOpacity style={styles.refreshBtn} onPress={() => init()}>
               <Text style={styles.refreshText}>Refresh</Text>
@@ -154,71 +214,43 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      {/* Action Buttons — Skip + Send Message */}
-      {visibleProfiles.length > 0 && (
-        <View style={[styles.actions, { paddingBottom: Math.max(6, insets.bottom) }]}>
-          <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={handleSkip} activeOpacity={0.7}>
-            <CloseIcon size={26} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={openCompose} activeOpacity={0.85} style={styles.sendBtnWrap}>
-            <LinearGradient
-              colors={[...Gradients.primary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sendBtn}
-            >
-              <SendIcon size={20} color="#fff" />
-              <Text style={styles.sendBtnText}>Send message</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Compose Modal */}
-      <Modal visible={composing} transparent animationType="slide" onRequestClose={() => setComposing(false)}>
+      {/* Bottom: text input replaces the X + Send buttons */}
+      {topProfile && (
         <KeyboardAvoidingView
-          style={styles.composeOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={80}
         >
-          <TouchableOpacity style={styles.composeBackdrop} activeOpacity={1} onPress={() => setComposing(false)} />
-          <View style={styles.composeSheet}>
-            <View style={styles.composeHandle} />
-            {topProfile && (
-              <Text style={styles.composeTitle}>Message {topProfile.displayName.split(' ')[0]}</Text>
-            )}
-            <Text style={styles.composeHint}>Write the first message they’ll see. They can accept or decline.</Text>
+          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom + 4, 10) }]}>
             <TextInput
-              style={styles.composeInput}
-              placeholder="Hey, I noticed we both…"
+              style={styles.input}
+              placeholder={`Message ${topProfile.displayName.split(' ')[0]}…`}
               placeholderTextColor={Colors.textMuted}
               value={draftMessage}
               onChangeText={setDraftMessage}
-              multiline
               maxLength={500}
-              autoFocus
+              returnKeyType="send"
+              onSubmitEditing={handleSend}
+              multiline
             />
-            <View style={styles.composeRow}>
-              <Text style={styles.composeCount}>{draftMessage.length}/500</Text>
-              <TouchableOpacity
-                style={[styles.composeSend, (!draftMessage.trim() || sending) && styles.composeSendDisabled]}
-                onPress={handleSend}
-                disabled={!draftMessage.trim() || sending}
-                activeOpacity={0.8}
+            <TouchableOpacity
+              style={[styles.sendBtn, (!draftMessage.trim() || sending) && styles.sendBtnDisabled]}
+              onPress={handleSend}
+              disabled={!draftMessage.trim() || sending}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[...Gradients.primary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sendGradient}
               >
-                <LinearGradient
-                  colors={[...Gradients.primary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.composeSendInner}
-                >
-                  <SendIcon size={16} color="#fff" />
-                  <Text style={styles.composeSendText}>{sending ? 'Sending…' : 'Send request'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+                <SendIcon size={18} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
+          <Text style={styles.swipeHint}>← swipe to skip   ·   swipe right to rewind</Text>
         </KeyboardAvoidingView>
-      </Modal>
+      )}
 
       {/* Scope Picker */}
       <Modal visible={scopePickerOpen} transparent animationType="fade" onRequestClose={() => setScopePickerOpen(false)}>
@@ -228,6 +260,7 @@ export default function DiscoverScreen() {
             <TouchableOpacity
               style={[styles.scopeOption, scope === 'world' && styles.scopeOptionActive]}
               onPress={() => handleSelectScope('world')}
+              activeOpacity={0.8}
             >
               <Text style={styles.scopeOptionText}>🌍 Worldwide</Text>
               <Text style={styles.scopeOptionHint}>Meet anyone, anywhere</Text>
@@ -235,6 +268,7 @@ export default function DiscoverScreen() {
             <TouchableOpacity
               style={[styles.scopeOption, scope === 'country' && styles.scopeOptionActive]}
               onPress={() => handleSelectScope('country')}
+              activeOpacity={0.8}
             >
               <Text style={styles.scopeOptionText}>
                 {myCountry ? `${myCountry.flag} ${myCountry.name}` : '📍 My country'}
@@ -246,6 +280,13 @@ export default function DiscoverScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <PaywallModal
+        visible={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        title="Unlock Rewind"
+        subtitle="Swipe right to revisit profiles you skipped — only with frnds+."
+      />
 
       <MatchModal
         visible={showMatch}
@@ -292,88 +333,59 @@ const styles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
   },
-  cardStack: { flex: 1, marginHorizontal: 10, marginTop: 2, marginBottom: 2 },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  cardStack: { flex: 1, marginHorizontal: 10, marginTop: 2, marginBottom: 4 },
+  hint: {
+    position: 'absolute',
+    top: 30,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: '#fff',
+    transform: [{ rotate: '-12deg' }],
   },
-  actionBtn: {
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  skipBtn: { width: 52, height: 52, backgroundColor: Colors.bgElevated },
-  sendBtnWrap: { flex: 1 },
-  sendBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 999,
-    paddingHorizontal: 18,
-  },
-  sendBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  hintLeft: { left: 18, borderColor: Colors.red, transform: [{ rotate: '-12deg' }] },
+  hintRight: { right: 18, borderColor: Colors.primaryLight, transform: [{ rotate: '12deg' }] },
+  hintText: { color: '#fff', fontWeight: '900', fontSize: 22, letterSpacing: 1 },
+
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, marginTop: 16 },
   emptyText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingHorizontal: 30 },
   refreshBtn: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: Colors.primary, borderRadius: 20 },
   refreshText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  composeOverlay: { flex: 1, justifyContent: 'flex-end' },
-  composeBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
-  composeSheet: {
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
     backgroundColor: Colors.bgCard,
-    paddingHorizontal: 18,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  input: {
+    flex: 1,
+    minHeight: 42,
+    maxHeight: 120,
+    paddingHorizontal: 14,
     paddingTop: 10,
-    paddingBottom: 26,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-  composeHandle: {
-    alignSelf: 'center',
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: Colors.border,
-    marginBottom: 14,
-  },
-  composeTitle: { color: Colors.text, fontSize: 20, fontWeight: '700' },
-  composeHint: { color: Colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 12 },
-  composeInput: {
-    minHeight: 110,
-    maxHeight: 220,
+    paddingBottom: 10,
     backgroundColor: Colors.bgInput,
+    borderRadius: 22,
     color: Colors.text,
-    padding: 14,
-    borderRadius: 14,
-    fontSize: 15,
-    textAlignVertical: 'top',
+    fontSize: 14,
   },
-  composeRow: {
-    flexDirection: 'row',
+  sendBtn: { borderRadius: 22, overflow: 'hidden' },
+  sendBtnDisabled: { opacity: 0.4 },
+  sendGradient: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
+    justifyContent: 'center',
   },
-  composeCount: { color: Colors.textMuted, fontSize: 12 },
-  composeSend: { borderRadius: 999, overflow: 'hidden' },
-  composeSendDisabled: { opacity: 0.5 },
-  composeSendInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-  },
-  composeSendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  swipeHint: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', backgroundColor: Colors.bgCard, paddingVertical: 4 },
 
   scopeOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   scopeSheet: {

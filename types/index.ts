@@ -9,6 +9,7 @@ export interface User {
   age: number;
   interests: string[];
   country?: string;
+  isPremium?: boolean;
   isOnline: boolean;
   lastSeen: string;
   location?: string;

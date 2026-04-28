@@ -54,6 +54,7 @@ const SCHEMA = `
     age INTEGER NOT NULL CHECK (age >= 13),
     interests TEXT DEFAULT '[]',
     country TEXT DEFAULT '',
+    is_premium INTEGER DEFAULT 0,
     is_online INTEGER DEFAULT 0,
     last_seen TEXT DEFAULT (datetime('now')),
     created_at TEXT DEFAULT (datetime('now'))
@@ -197,6 +198,7 @@ export function formatUser(row: any): any {
     interests: typeof row.interests === 'string' ? JSON.parse(row.interests || '[]') : (row.interests || []),
     photos: typeof row.photos === 'string' ? JSON.parse(row.photos || '[]') : (row.photos || []),
     country: row.country || '',
+    isPremium: !!row.is_premium,
     isOnline: !!row.is_online,
     lastSeen: row.last_seen,
     createdAt: row.created_at,

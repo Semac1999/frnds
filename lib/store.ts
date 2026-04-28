@@ -17,6 +17,7 @@ function normalizeUser(u: any): User {
     age: u.age || 0,
     interests: typeof u.interests === 'string' ? JSON.parse(u.interests) : (u.interests || []),
     country: u.country || '',
+    isPremium: !!(u.isPremium ?? u.is_premium),
     isOnline: !!(u.isOnline ?? u.is_online),
     lastSeen: u.lastSeen || u.last_seen || new Date().toISOString(),
     location: u.location,
@@ -105,6 +106,10 @@ interface DiscoverState {
   setScope: (scope: 'world' | 'country') => Promise<void>;
   /** Skip current profile (move on without sending a request). */
   skip: () => void;
+  /** Go back to the previously skipped profile. Premium-only. Returns false when nothing to undo. */
+  goBack: () => boolean;
+  /** True when the previous-card history has at least one entry. */
+  canGoBack: () => boolean;
   /** Send DM request to current profile and advance. Returns matchId if auto-matched. */
   sendRequest: (content: string) => Promise<{ matched: boolean; matchId?: string } | null>;
   reset: () => void;
@@ -144,6 +149,13 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   skip: () => {
     const { currentIndex } = get();
     set({ currentIndex: currentIndex + 1 });
+  },
+  canGoBack: () => get().currentIndex > 0,
+  goBack: () => {
+    const { currentIndex } = get();
+    if (currentIndex <= 0) return false;
+    set({ currentIndex: currentIndex - 1 });
+    return true;
   },
   sendRequest: async (content) => {
     const { profiles, currentIndex, matches } = get();

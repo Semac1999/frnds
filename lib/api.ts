@@ -79,6 +79,8 @@ export const api = {
     request('/api/users/me/photos', { method: 'POST', body: JSON.stringify({ photo: base64 }) }),
   deletePhoto: (index: number) =>
     request(`/api/users/me/photos/${index}`, { method: 'DELETE' }),
+  /** Mock premium upgrade. In prod this would post a receipt to verify. */
+  upgradePremium: () => request('/api/users/me/premium', { method: 'POST' }),
 
   // Message Requests (replaces swipe flow)
   sendRequest: (recipientId: string, content: string) =>

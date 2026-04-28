@@ -23,7 +23,7 @@ router.get('/discover', authMiddleware, (req: AuthRequest, res: Response) => {
 
   // Exclude users I already have a pending request with (sent or received)
   const baseSql = `
-    SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online
+    SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online
     FROM users
     WHERE id != ?
       AND id NOT IN (
@@ -60,7 +60,16 @@ router.post('/me/photo', authMiddleware, (req: AuthRequest, res: Response) => {
   }
 
   run('UPDATE users SET avatar = ? WHERE id = ?', [photo, req.userId]);
-  const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, is_online FROM users WHERE id = ?', [req.userId]);
+  const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [req.userId]);
+  res.json(formatUser(user));
+});
+
+// POST /api/users/me/premium — mock premium upgrade
+// In production this would verify an App Store / Play Store / Stripe receipt.
+// For now it just flips the flag so the paywall flow works end-to-end.
+router.post('/me/premium', authMiddleware, (req: AuthRequest, res: Response) => {
+  run('UPDATE users SET is_premium = 1 WHERE id = ?', [req.userId]);
+  const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [req.userId]);
   res.json(formatUser(user));
 });
 
@@ -80,7 +89,7 @@ router.post('/me/photos', authMiddleware, (req: AuthRequest, res: Response) => {
   photos.push(photo);
   run('UPDATE users SET photos = ? WHERE id = ?', [JSON.stringify(photos), req.userId]);
 
-  const updated = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online FROM users WHERE id = ?', [req.userId]);
+  const updated = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [req.userId]);
   res.json(formatUser(updated));
 });
 
@@ -96,13 +105,13 @@ router.delete('/me/photos/:index', authMiddleware, (req: AuthRequest, res: Respo
   photos.splice(idx, 1);
   run('UPDATE users SET photos = ? WHERE id = ?', [JSON.stringify(photos), req.userId]);
 
-  const updated = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online FROM users WHERE id = ?', [req.userId]);
+  const updated = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [req.userId]);
   res.json(formatUser(updated));
 });
 
 // GET /api/users/:id
 router.get('/:id', authMiddleware, (req: AuthRequest, res: Response) => {
-  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online FROM users WHERE id = ?', [req.params.id]);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(formatUser(user));
 });
@@ -124,7 +133,7 @@ router.patch('/me', authMiddleware, (req: AuthRequest, res: Response) => {
   values.push(req.userId);
   run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
 
-  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online FROM users WHERE id = ?', [req.userId]);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_premium, is_online FROM users WHERE id = ?', [req.userId]);
   res.json(formatUser(user));
 });
 
