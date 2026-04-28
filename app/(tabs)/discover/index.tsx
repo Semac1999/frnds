@@ -7,6 +7,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, withTiming, interpolate } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Colors, Gradients } from '../../../constants/colors';
 import { useDiscoverStore, useAuthStore, useStoryStore } from '../../../lib/store';
@@ -67,6 +68,7 @@ export default function DiscoverScreen() {
   const translateX = useSharedValue(0);
 
   const animateAndSkip = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     skip();
     setDraftMessage('');
   }, [skip]);
@@ -76,6 +78,7 @@ export default function DiscoverScreen() {
       setPaywallOpen(true);
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     goBack();
   }, [currentUser?.isPremium, goBack]);
 
@@ -143,8 +146,11 @@ export default function DiscoverScreen() {
       setSending(false);
       setDraftMessage('');
       if (res?.matched && profile) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         setMatchedUser(profile);
         setShowMatch(true);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
     } catch (err: any) {
       setSending(false);

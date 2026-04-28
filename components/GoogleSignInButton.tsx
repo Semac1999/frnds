@@ -6,6 +6,7 @@ import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
 import { setToken, connectSocket } from '../lib/api';
+import { saveToken } from '../lib/session';
 import { useAuthStore, useDiscoverStore, useChatStore, useStoryStore } from '../lib/store';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -91,6 +92,7 @@ function ConfiguredGoogleButton({ mode }: Props) {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'Google sign-in failed');
         setToken(data.token);
+        await saveToken(data.token);
         connectSocket(data.token);
         loginLocal(data.user);
         await Promise.all([

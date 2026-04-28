@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { User, SwipeProfile, ChatPreview, StoryGroup, Message, MessageRequest } from '../types';
 import { generateProfiles, generateChats, generateStories, generateMessages, getRandomReply } from './mock-data';
 import { api, setToken, getToken, connectSocket, disconnectSocket, getSocket } from './api';
+import { saveToken, loadToken, clearToken } from './session';
 
 // Normalize snake_case API responses to camelCase User objects
 function normalizeUser(u: any): User {
@@ -32,11 +33,15 @@ interface AuthState {
   /** True only between successful signup and the welcome animation finishing. */
   justSignedUp: boolean;
   loading: boolean;
+  /** True while we're restoring a saved session on app launch. */
+  restoring: boolean;
   error: string | null;
   signup: (data: { email: string; password: string; username: string; displayName: string; age: number; interests: string[]; country?: string; photo?: string }) => Promise<void>;
   login: (data: { email: string; password: string }) => Promise<void>;
   loginLocal: (user: User) => void;
   logout: () => Promise<void>;
+  /** Try to restore a saved session from SecureStore. Returns true if user is logged in. */
+  restoreSession: () => Promise<boolean>;
   setOnboarded: () => void;
   clearJustSignedUp: () => void;
   clearError: () => void;
@@ -48,6 +53,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   hasOnboarded: false,
   justSignedUp: false,
   loading: false,
+  restoring: true,
   error: null,
   signup: async (data: any) => {
     set({ loading: true, error: null });
@@ -56,6 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { photo, ...signupBody } = data;
       const res = await api.signup(signupBody);
       setToken(res.token);
+      await saveToken(res.token);
       connectSocket(res.token);
       const user = normalizeUser(res.user);
 
@@ -80,6 +87,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const res = await api.login(data);
       setToken(res.token);
+      await saveToken(res.token);
       connectSocket(res.token);
       set({ user: normalizeUser(res.user), isAuthenticated: true, loading: false });
     } catch (err: any) {
@@ -96,7 +104,31 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
     disconnectSocket();
     setToken(null);
+    await clearToken();
     set({ user: null, isAuthenticated: false });
+  },
+  restoreSession: async () => {
+    const token = await loadToken();
+    if (!token) {
+      set({ restoring: false });
+      return false;
+    }
+    setToken(token);
+    try {
+      // Verify the token is still valid + fetch the latest user data
+      const me = await api.me();
+      const user = normalizeUser(me);
+      connectSocket(token);
+      set({ user, isAuthenticated: true, restoring: false });
+      return true;
+    } catch (err) {
+      // Token expired or invalid — clear it
+      console.warn('restoreSession: token invalid', err);
+      setToken(null);
+      await clearToken();
+      set({ restoring: false });
+      return false;
+    }
   },
   setOnboarded: () => set({ hasOnboarded: true }),
   clearJustSignedUp: () => set({ justSignedUp: false }),

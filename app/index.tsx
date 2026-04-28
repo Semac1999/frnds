@@ -2,29 +2,47 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Colors, Gradients } from '../constants/colors';
-import { useAuthStore } from '../lib/store';
+import { useAuthStore, useDiscoverStore, useChatStore, useStoryStore } from '../lib/store';
 
 export default function SplashScreen() {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.8));
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const restoreSession = useAuthStore((s) => s.restoreSession);
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, friction: 8, useNativeDriver: true }),
     ]).start();
 
-    const timer = setTimeout(() => {
-      if (isAuthenticated) {
-        router.replace('/(tabs)/discover');
-      } else {
-        router.replace('/(auth)/onboarding');
-      }
-    }, 2000);
+    // Restore saved session in parallel with the splash animation.
+    // Always wait at least 800ms so the splash isn't a jarring flash.
+    let cancelled = false;
+    const start = Date.now();
+    const minSplashMs = 800;
 
-    return () => clearTimeout(timer);
+    (async () => {
+      const ok = await restoreSession();
+      const elapsed = Date.now() - start;
+      const wait = Math.max(0, minSplashMs - elapsed);
+
+      setTimeout(() => {
+        if (cancelled) return;
+        if (ok) {
+          // Hydrate the rest of the stores in the background, then route in
+          Promise.all([
+            useDiscoverStore.getState().init(),
+            useChatStore.getState().init(),
+            useStoryStore.getState().init(),
+          ]).catch(() => {});
+          router.replace('/(tabs)/discover');
+        } else {
+          router.replace('/(auth)/onboarding');
+        }
+      }, wait);
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
   return (
