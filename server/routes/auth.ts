@@ -12,7 +12,7 @@ function randomId() {
 
 // POST /api/auth/signup
 router.post('/signup', (req: AuthRequest, res: Response) => {
-  const { email, password, username, displayName, age, interests } = req.body;
+  const { email, password, username, displayName, age, interests, country } = req.body;
 
   if (!email || !password || !username || !displayName || !age) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -31,12 +31,12 @@ router.post('/signup', (req: AuthRequest, res: Response) => {
   const avatar = displayName.substring(0, 2).toUpperCase();
 
   run(`
-    INSERT INTO users (id, email, password_hash, username, display_name, avatar, age, interests, is_online)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `, [id, email, passwordHash, username, displayName, avatar, age, JSON.stringify(interests || [])]);
+    INSERT INTO users (id, email, password_hash, username, display_name, avatar, age, interests, country, is_online)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `, [id, email, passwordHash, username, displayName, avatar, age, JSON.stringify(interests || []), country || '']);
 
   const token = generateToken(id);
-  const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [id]);
+  const user = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online, created_at FROM users WHERE id = ?', [id]);
 
   res.status(201).json({ token, user: formatUser(user) });
 });
@@ -61,7 +61,7 @@ router.post('/login', (req: AuthRequest, res: Response) => {
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req: AuthRequest, res: Response) => {
-  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, is_online, created_at FROM users WHERE id = ?', [req.userId]);
+  const user: any = queryOne('SELECT id, username, display_name, avatar, photos, bio, age, interests, country, is_online, created_at FROM users WHERE id = ?', [req.userId]);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(formatUser(user));
 });

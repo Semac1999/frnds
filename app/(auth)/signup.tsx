@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image, Modal, FlatList } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { GradientButton } from '../../components/GradientButton';
 import { InterestTag } from '../../components/InterestTag';
-import { CameraIcon } from '../../components/Icons';
+import { CameraIcon, PinIcon } from '../../components/Icons';
 import { useAuthStore, useDiscoverStore, useChatStore, useStoryStore } from '../../lib/store';
+import { COUNTRIES, getCountry } from '../../constants/countries';
 
 const ALL_INTERESTS = ['music', 'gaming', 'sports', 'art', 'travel', 'food', 'movies', 'fitness', 'tech', 'fashion', 'photography', 'animals'];
 
@@ -19,6 +20,8 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [country, setCountry] = useState<string>('');
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const signup = useAuthStore((s) => s.signup);
   const loading = useAuthStore((s) => s.loading);
 
@@ -60,6 +63,7 @@ export default function SignupScreen() {
         displayName: name.trim(),
         age: ageNum,
         interests,
+        country: country || undefined,
         photo: photo || undefined,
       });
 
@@ -117,6 +121,15 @@ export default function SignupScreen() {
         <TextInput style={styles.input} placeholder="Password" placeholderTextColor={Colors.textMuted} value={password} onChangeText={setPassword} secureTextEntry />
       </View>
 
+      <TouchableOpacity style={styles.countryBtn} onPress={() => setCountryPickerOpen(true)} activeOpacity={0.7}>
+        <PinIcon size={16} color={Colors.textMuted} />
+        <Text style={[styles.countryText, !country && { color: Colors.textMuted }]}>
+          {country
+            ? `${getCountry(country)?.flag || ''} ${getCountry(country)?.name || country}`
+            : 'Country (optional, lets you filter Discover)'}
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.vibesLabel}>Pick your vibes:</Text>
       <View style={styles.tags}>
         {ALL_INTERESTS.map((tag) => (
@@ -129,6 +142,31 @@ export default function SignupScreen() {
       ) : (
         <GradientButton title="Create Account" onPress={handleSignup} style={{ marginTop: 20 }} />
       )}
+
+      <Modal visible={countryPickerOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCountryPickerOpen(false)}>
+        <View style={styles.pickerContainer}>
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setCountryPickerOpen(false)}>
+              <Text style={styles.pickerCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Select Country</Text>
+            <View style={{ width: 50 }} />
+          </View>
+          <FlatList
+            data={COUNTRIES}
+            keyExtractor={(c) => c.code}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.countryRow, country === item.code && styles.countryRowActive]}
+                onPress={() => { setCountry(item.code); setCountryPickerOpen(false); }}
+              >
+                <Text style={styles.countryFlag}>{item.flag}</Text>
+                <Text style={styles.countryName}>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -150,4 +188,28 @@ const styles = StyleSheet.create({
   input: { padding: 14, paddingLeft: 16, backgroundColor: Colors.bgInput, borderWidth: 2, borderColor: Colors.border, borderRadius: Layout.radiusSm, color: Colors.text, fontSize: 15 },
   vibesLabel: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary, marginBottom: 10, marginTop: 8 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  countryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 14, paddingLeft: 16,
+    backgroundColor: Colors.bgInput,
+    borderWidth: 2, borderColor: Colors.border, borderRadius: Layout.radiusSm,
+    marginBottom: 14,
+  },
+  countryText: { color: Colors.text, fontSize: 15, flex: 1 },
+  pickerContainer: { flex: 1, backgroundColor: Colors.bg, paddingTop: 16 },
+  pickerHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 16,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pickerTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
+  pickerCancel: { fontSize: 15, color: Colors.textMuted },
+  countryRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border,
+  },
+  countryRowActive: { backgroundColor: Colors.bgCard },
+  countryFlag: { fontSize: 22 },
+  countryName: { color: Colors.text, fontSize: 15 },
 });

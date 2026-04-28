@@ -8,9 +8,18 @@ export interface User {
   bio: string;
   age: number;
   interests: string[];
+  country?: string;
   isOnline: boolean;
   lastSeen: string;
   location?: string;
+}
+
+export interface MessageRequest {
+  id: string;
+  sender: User;
+  content: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
 }
 
 export interface Match {

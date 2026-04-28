@@ -16,6 +16,7 @@ import matchRoutes from './routes/matches';
 import chatRoutes from './routes/chat';
 import storyRoutes from './routes/stories';
 import reportRoutes from './routes/reports';
+import requestRoutes from './routes/requests';
 
 async function main() {
   // Initialize sql.js database before anything else
@@ -40,6 +41,7 @@ async function main() {
   app.use('/api/swipes', matchRoutes); // POST /api/swipes for swiping
   app.use('/api/matches', matchRoutes); // GET /api/matches for match list
   app.use('/api/matches', chatRoutes);  // GET/POST /api/matches/:matchId/messages
+  app.use('/api/requests', requestRoutes); // DM request flow
   app.use('/api/stories', storyRoutes);
 
   // Health check

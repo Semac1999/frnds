@@ -56,7 +56,7 @@ export function disconnectSocket() {
 
 export const api = {
   // Auth
-  signup: (body: { email: string; password: string; username: string; displayName: string; age: number; interests: string[]; photo?: string }) =>
+  signup: (body: { email: string; password: string; username: string; displayName: string; age: number; interests: string[]; country?: string; photo?: string }) =>
     request('/api/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   uploadPhoto: (base64: string) =>
     request('/api/users/me/photo', { method: 'POST', body: JSON.stringify({ photo: base64 }) }),
@@ -66,13 +66,30 @@ export const api = {
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 
   // Users
-  discover: (limit = 20) => request(`/api/users/discover?limit=${limit}`),
+  discover: (opts: { limit?: number; scope?: 'world' | 'country'; country?: string } = {}) => {
+    const params = new URLSearchParams();
+    params.set('limit', String(opts.limit ?? 20));
+    if (opts.scope) params.set('scope', opts.scope);
+    if (opts.country) params.set('country', opts.country);
+    return request(`/api/users/discover?${params.toString()}`);
+  },
   getUser: (id: string) => request(`/api/users/${id}`),
   updateProfile: (body: Record<string, any>) => request('/api/users/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  addPhoto: (base64: string) =>
+    request('/api/users/me/photos', { method: 'POST', body: JSON.stringify({ photo: base64 }) }),
+  deletePhoto: (index: number) =>
+    request(`/api/users/me/photos/${index}`, { method: 'DELETE' }),
 
-  // Swipes & Matches
-  swipe: (swipedId: string, direction: 'like' | 'pass') =>
-    request('/api/swipes', { method: 'POST', body: JSON.stringify({ swipedId, direction }) }),
+  // Message Requests (replaces swipe flow)
+  sendRequest: (recipientId: string, content: string) =>
+    request('/api/requests', { method: 'POST', body: JSON.stringify({ recipientId, content }) }),
+  getRequests: () => request('/api/requests'),
+  getSentRequests: () => request('/api/requests/sent'),
+  acceptRequest: (id: string) => request(`/api/requests/${id}/accept`, { method: 'POST' }),
+  declineRequest: (id: string) => request(`/api/requests/${id}/decline`, { method: 'POST' }),
+  cancelRequest: (id: string) => request(`/api/requests/${id}`, { method: 'DELETE' }),
+
+  // Matches
   getMatches: () => request('/api/matches'),
 
   // Chat
