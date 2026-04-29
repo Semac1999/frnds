@@ -3,8 +3,7 @@ import { View, Text, StyleSheet, Image, useWindowDimensions } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, interpolate, SharedValue } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
-import { InterestTag } from './InterestTag';
-import { LocationIcon } from './Icons';
+import { getCountry } from '../constants/countries';
 import type { SwipeProfile } from '../types';
 
 interface Props {
@@ -16,6 +15,7 @@ interface Props {
 
 export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props) {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
+
   const animatedStyle = useAnimatedStyle(() => {
     if (!isTop || !translateX) {
       return {
@@ -25,7 +25,7 @@ export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props)
         ],
       };
     }
-    const rotate = interpolate(translateX.value, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-15, 0, 15]);
+    const rotate = interpolate(translateX.value, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-12, 0, 12]);
     return {
       transform: [
         { translateX: translateX.value },
@@ -34,18 +34,9 @@ export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props)
     };
   });
 
-  const likeStyle = useAnimatedStyle(() => {
-    if (!translateX) return { opacity: 0 };
-    return { opacity: interpolate(translateX.value, [0, SCREEN_WIDTH / 4], [0, 1]) };
-  });
-
-  const nopeStyle = useAnimatedStyle(() => {
-    if (!translateX) return { opacity: 0 };
-    return { opacity: interpolate(translateX.value, [0, -SCREEN_WIDTH / 4], [0, 1]) };
-  });
-
   const photoUri = profile.photo || profile.avatar;
-  const hasPhoto = photoUri && (photoUri.startsWith('data:image') || photoUri.startsWith('http') || photoUri.startsWith('file:'));
+  const hasPhoto = !!photoUri && (photoUri.startsWith('data:image') || photoUri.startsWith('http') || photoUri.startsWith('file:'));
+  const country = getCountry(profile.country);
 
   return (
     <Animated.View style={[styles.card, animatedStyle, { zIndex: 10 - stackIndex }]}>
@@ -61,35 +52,56 @@ export function SwipeCard({ profile, isTop, translateX, stackIndex = 0 }: Props)
           <Text style={styles.avatarText}>{profile.avatar}</Text>
         </LinearGradient>
       )}
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.gradient} />
 
+      {/* Top fade for header readability */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.55)', 'transparent']}
+        style={styles.topGradient}
+        pointerEvents="none"
+      />
+
+      {/* Wizz-style top header */}
       {isTop && (
-        <>
-          <Animated.View style={[styles.stamp, styles.stampLike, likeStyle]}>
-            <Text style={styles.stampText}>LIKE</Text>
-          </Animated.View>
-          <Animated.View style={[styles.stamp, styles.stampNope, nopeStyle]}>
-            <Text style={[styles.stampText, { color: Colors.red }]}>NOPE</Text>
-          </Animated.View>
-        </>
+        <View style={styles.headerRow} pointerEvents="none">
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {profile.displayName.split(' ')[0]}
+            </Text>
+            <View style={styles.headerMeta}>
+              <Text style={styles.headerAge}>{profile.age}</Text>
+              {country && <Text style={styles.headerFlag}>{country.flag}</Text>}
+              {profile.isOnline && (
+                <View style={styles.onlinePill}>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.onlineText}>online now</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
       )}
 
-      <View style={styles.info}>
-        <Text style={styles.name}>
-          {profile.displayName} <Text style={styles.age}>{profile.age}</Text>
-        </Text>
-        {profile.location && (
-          <View style={styles.location}>
-            <LocationIcon size={12} color={Colors.textSecondary} />
-            <Text style={styles.locationText}>{profile.location}</Text>
+      {/* Bottom fade for the bio readability */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.78)']}
+        style={styles.bottomGradient}
+        pointerEvents="none"
+      />
+
+      {/* Bio at bottom */}
+      <View style={styles.bottomInfo} pointerEvents="none">
+        {profile.bio ? (
+          <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text>
+        ) : null}
+        {profile.interests.length > 0 && (
+          <View style={styles.tagsRow}>
+            {profile.interests.slice(0, 3).map((tag) => (
+              <View key={tag} style={styles.tagPill}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
           </View>
         )}
-        <Text style={styles.bio}>{profile.bio}</Text>
-        <View style={styles.tags}>
-          {profile.interests.slice(0, 3).map((tag) => (
-            <InterestTag key={tag} label={tag} small />
-          ))}
-        </View>
       </View>
     </Animated.View>
   );
@@ -100,73 +112,49 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: Colors.bgCard,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 10,
   },
-  background: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backgroundPhoto: {
-    flex: 1,
-    width: '100%',
-  },
+  background: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  backgroundPhoto: { flex: 1, width: '100%' },
   avatarText: {
-    fontSize: 80,
+    fontSize: 96,
     fontWeight: '900',
-    color: 'rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.22)',
     letterSpacing: 4,
   },
-  gradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
+  topGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 130 },
+  bottomGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 200 },
+
+  // Wizz-style top header
+  headerRow: {
+    position: 'absolute', top: 14, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  info: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 22,
-    paddingBottom: 26,
+  headerLeft: { flex: 1, gap: 2 },
+  headerName: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerAge: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  headerFlag: { fontSize: 16 },
+  onlinePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+    marginLeft: 4,
   },
-  name: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.8, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
-  age: { fontSize: 28, fontWeight: '500', color: 'rgba(255,255,255,0.85)', letterSpacing: -0.5 },
-  location: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  locationText: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
-  bio: { fontSize: 15, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 12, lineHeight: 21, fontWeight: '500' },
-  tags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  stamp: {
-    position: 'absolute',
-    top: 50,
-    padding: 8,
-    paddingHorizontal: 16,
-    borderWidth: 4,
-    borderRadius: 12,
-    zIndex: 10,
-  },
-  stampLike: {
-    left: 20,
-    borderColor: Colors.green,
-    transform: [{ rotate: '-15deg' }],
-  },
-  stampNope: {
-    right: 20,
-    borderColor: Colors.red,
-    transform: [{ rotate: '15deg' }],
-  },
-  stampText: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: Colors.green,
-  },
+  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  onlineText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
+
+  // Bottom info
+  bottomInfo: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, paddingBottom: 22 },
+  bio: { color: '#fff', fontSize: 16, lineHeight: 22, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  tagsRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },
+  tagPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.22)' },
+  tagText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 });
