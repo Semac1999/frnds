@@ -67,9 +67,7 @@ export function TabBar({ state, descriptors, navigation }: Props) {
                 <ProfileIcon size={24} color={color} filled={isFocused} />
               )}
               {index === 0 && totalUnread > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{totalUnread}</Text>
-                </View>
+                <View style={styles.badgeDot} />
               )}
             </View>
             <Text style={[styles.label, { color }]}>{tab.label}</Text>
@@ -118,21 +116,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  badge: {
+  badgeDot: {
     position: 'absolute',
-    top: -4,
-    right: -8,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -2,
+    right: -4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
+    borderWidth: 2,
+    borderColor: Colors.bgCard,
   },
 });

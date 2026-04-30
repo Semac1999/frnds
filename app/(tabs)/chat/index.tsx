@@ -58,11 +58,7 @@ export default function ChatListScreen() {
       </View>
       <View style={styles.chatMeta}>
         <Text style={styles.chatTime}>{item.lastMessageTime}</Text>
-        {item.unreadCount > 0 && (
-          <View style={styles.unread}>
-            <Text style={styles.unreadText}>{item.unreadCount}</Text>
-          </View>
-        )}
+        {item.unreadCount > 0 && <View style={styles.unreadDot} />}
       </View>
     </TouchableOpacity>
   );
@@ -105,11 +101,7 @@ export default function ChatListScreen() {
             activeOpacity={0.8}
           >
             <Text style={[styles.tabText, tab === 'requests' && styles.tabTextActive]}>Requests</Text>
-            {incoming.length > 0 && (
-              <View style={styles.tabBadge}>
-                <Text style={styles.tabBadgeText}>{incoming.length}</Text>
-              </View>
-            )}
+            {incoming.length > 0 && <View style={styles.tabBadgeDot} />}
           </TouchableOpacity>
         </View>
 
@@ -199,16 +191,13 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: Colors.primary },
   tabText: { color: Colors.textMuted, fontWeight: '700', fontSize: 13 },
   tabTextActive: { color: '#fff' },
-  tabBadge: {
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 9,
+  tabBadgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginLeft: 2,
   },
-  tabBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgInput, borderRadius: 16, paddingHorizontal: 14, gap: 8, marginBottom: 16 },
   searchInput: { flex: 1, paddingVertical: 12, color: Colors.text, fontSize: 14 },
   matchesSection: { paddingHorizontal: 16, marginBottom: 16 },
@@ -222,8 +211,7 @@ const styles = StyleSheet.create({
   chatLast: { fontSize: 13, color: Colors.textMuted },
   chatMeta: { alignItems: 'flex-end', gap: 4 },
   chatTime: { fontSize: 12, color: Colors.textMuted },
-  unread: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.accent },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 6 },
   emptyText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' },

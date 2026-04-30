@@ -142,20 +142,63 @@ const SCHEMA = `
 `;
 
 // ===== DEMO SEED DATA =====
+// Photos pulled from randomuser.me CDN — free, stable, no API key needed.
+// Each demo user has a primary photo + 2 gallery photos so tap-to-navigate works.
+const PORTRAIT = (gender: 'women' | 'men', n: number) => `https://randomuser.me/api/portraits/${gender}/${n}.jpg`;
+
 const DEMO_USERS = [
-  { username: 'emma_j', displayName: 'Emma Johnson', age: 21, country: 'US', bio: 'Art student who loves coffee shops and spontaneous road trips. Always down for a museum day.', interests: ['art', 'coffee', 'travel', 'photography'] },
-  { username: 'liam_chen', displayName: 'Liam Chen', age: 20, country: 'US', bio: 'CS major by day, bedroom DJ by night. Looking for people to grab ramen with.', interests: ['music', 'coding', 'ramen', 'gaming'] },
-  { username: 'sofia_r', displayName: 'Sofia Rodriguez', age: 22, country: 'ES', bio: 'Dance team captain. If you can keep up with my energy, we will get along great.', interests: ['dance', 'fitness', 'cooking', 'netflix'] },
-  { username: 'noah_w', displayName: 'Noah Williams', age: 19, country: 'GB', bio: 'Freshman trying to find my people. I like hiking, board games, and deep conversations at 2am.', interests: ['hiking', 'board games', 'philosophy', 'nature'] },
-  { username: 'ava_patel', displayName: 'Ava Patel', age: 23, country: 'IN', bio: 'Med school survivor. My love language is sharing memes and bringing you snacks while you study.', interests: ['medicine', 'memes', 'yoga', 'dogs'] },
-  { username: 'mason_k', displayName: 'Mason Kim', age: 20, country: 'KR', bio: 'Film student with strong opinions about cinematography. Let me recommend you a movie.', interests: ['film', 'cinema', 'photography', 'writing'] },
-  { username: 'zoe_b', displayName: 'Zoe Brooks', age: 21, country: 'CA', bio: 'Environmental science major. I compost, I thrift, and I will judge your recycling habits (lovingly).', interests: ['environment', 'thrifting', 'plants', 'sustainability'] },
-  { username: 'ethan_m', displayName: 'Ethan Murphy', age: 24, country: 'IE', bio: 'Grad student and amateur chef. I make a mean pasta carbonara and even better playlists.', interests: ['cooking', 'music', 'running', 'podcasts'] },
-  { username: 'chloe_t', displayName: 'Chloe Taylor', age: 19, country: 'AU', bio: 'Theatre kid turned college student. If you quote Vine, we are already friends.', interests: ['theatre', 'singing', 'comedy', 'fashion'] },
-  { username: 'jayden_o', displayName: 'Jayden Ortiz', age: 22, country: 'US', bio: 'Basketball player with a secret love for baking. Yes, I will make you cookies.', interests: ['basketball', 'baking', 'sneakers', 'anime'] },
-  { username: 'lily_n', displayName: 'Lily Nguyen', age: 20, country: 'VN', bio: 'Graphic design major who spends too much time on Pinterest. Let me design your playlist cover.', interests: ['design', 'art', 'music', 'skateboarding'] },
-  { username: 'caleb_d', displayName: 'Caleb Davis', age: 23, country: 'US', bio: 'Engineering student and rock climbing addict. Always looking for new climbing buddies.', interests: ['climbing', 'engineering', 'camping', 'coffee'] },
-  { username: 'mia_foster', displayName: 'Mia Foster', age: 18, country: 'BE', bio: 'Freshman vibes. I play guitar badly and make friendship bracelets really well.', interests: ['guitar', 'crafts', 'concerts', 'reading'] },
+  { username: 'emma_j', displayName: 'Emma Johnson', age: 21, country: 'US',
+    bio: 'Art student who loves coffee shops and spontaneous road trips. Always down for a museum day.',
+    interests: ['art', 'coffee', 'travel', 'photography'],
+    photo: PORTRAIT('women', 47), photos: [PORTRAIT('women', 12), PORTRAIT('women', 33)] },
+  { username: 'liam_chen', displayName: 'Liam Chen', age: 20, country: 'US',
+    bio: 'CS major by day, bedroom DJ by night. Looking for people to grab ramen with.',
+    interests: ['music', 'coding', 'ramen', 'gaming'],
+    photo: PORTRAIT('men', 32), photos: [PORTRAIT('men', 19), PORTRAIT('men', 75)] },
+  { username: 'sofia_r', displayName: 'Sofia Rodriguez', age: 22, country: 'ES',
+    bio: 'Dance team captain. If you can keep up with my energy, we will get along great.',
+    interests: ['dance', 'fitness', 'cooking', 'netflix'],
+    photo: PORTRAIT('women', 22), photos: [PORTRAIT('women', 51), PORTRAIT('women', 8)] },
+  { username: 'noah_w', displayName: 'Noah Williams', age: 19, country: 'GB',
+    bio: 'Freshman trying to find my people. I like hiking, board games, and deep conversations at 2am.',
+    interests: ['hiking', 'board games', 'philosophy', 'nature'],
+    photo: PORTRAIT('men', 22), photos: [PORTRAIT('men', 5), PORTRAIT('men', 41)] },
+  { username: 'ava_patel', displayName: 'Ava Patel', age: 23, country: 'IN',
+    bio: 'Med school survivor. My love language is sharing memes and bringing you snacks while you study.',
+    interests: ['medicine', 'memes', 'yoga', 'dogs'],
+    photo: PORTRAIT('women', 60), photos: [PORTRAIT('women', 71), PORTRAIT('women', 28)] },
+  { username: 'mason_k', displayName: 'Mason Kim', age: 20, country: 'KR',
+    bio: 'Film student with strong opinions about cinematography. Let me recommend you a movie.',
+    interests: ['film', 'cinema', 'photography', 'writing'],
+    photo: PORTRAIT('men', 45), photos: [PORTRAIT('men', 56), PORTRAIT('men', 11)] },
+  { username: 'zoe_b', displayName: 'Zoe Brooks', age: 21, country: 'CA',
+    bio: 'Environmental science major. I compost, I thrift, and I will judge your recycling habits (lovingly).',
+    interests: ['environment', 'thrifting', 'plants', 'sustainability'],
+    photo: PORTRAIT('women', 38), photos: [PORTRAIT('women', 17), PORTRAIT('women', 90)] },
+  { username: 'ethan_m', displayName: 'Ethan Murphy', age: 24, country: 'IE',
+    bio: 'Grad student and amateur chef. I make a mean pasta carbonara and even better playlists.',
+    interests: ['cooking', 'music', 'running', 'podcasts'],
+    photo: PORTRAIT('men', 67), photos: [PORTRAIT('men', 78), PORTRAIT('men', 28)] },
+  { username: 'chloe_t', displayName: 'Chloe Taylor', age: 19, country: 'AU',
+    bio: 'Theatre kid turned college student. If you quote Vine, we are already friends.',
+    interests: ['theatre', 'singing', 'comedy', 'fashion'],
+    photo: PORTRAIT('women', 5), photos: [PORTRAIT('women', 68), PORTRAIT('women', 44)] },
+  { username: 'jayden_o', displayName: 'Jayden Ortiz', age: 22, country: 'US',
+    bio: 'Basketball player with a secret love for baking. Yes, I will make you cookies.',
+    interests: ['basketball', 'baking', 'sneakers', 'anime'],
+    photo: PORTRAIT('men', 84), photos: [PORTRAIT('men', 36), PORTRAIT('men', 60)] },
+  { username: 'lily_n', displayName: 'Lily Nguyen', age: 20, country: 'VN',
+    bio: 'Graphic design major who spends too much time on Pinterest. Let me design your playlist cover.',
+    interests: ['design', 'art', 'music', 'skateboarding'],
+    photo: PORTRAIT('women', 19), photos: [PORTRAIT('women', 76), PORTRAIT('women', 56)] },
+  { username: 'caleb_d', displayName: 'Caleb Davis', age: 23, country: 'US',
+    bio: 'Engineering student and rock climbing addict. Always looking for new climbing buddies.',
+    interests: ['climbing', 'engineering', 'camping', 'coffee'],
+    photo: PORTRAIT('men', 14), photos: [PORTRAIT('men', 50), PORTRAIT('men', 92)] },
+  { username: 'mia_foster', displayName: 'Mia Foster', age: 18, country: 'BE',
+    bio: 'Freshman vibes. I play guitar badly and make friendship bracelets really well.',
+    interests: ['guitar', 'crafts', 'concerts', 'reading'],
+    photo: PORTRAIT('women', 81), photos: [PORTRAIT('women', 43), PORTRAIT('women', 6)] },
 ];
 
 // Reserved username for the welcome bot account.
@@ -242,11 +285,14 @@ export function seedDemoUsers(): { seeded: boolean; count: number } {
 
   for (const u of DEMO_USERS) {
     const id = crypto.randomUUID();
-    const avatar = u.displayName.substring(0, 2).toUpperCase();
     const email = `${u.username}@demo.frnds.app`;
+    // formatUser auto-routes URL avatars into the `photo` field on read,
+    // so we just store the URL in the avatar column.
+    const avatar = u.photo || u.displayName.substring(0, 2).toUpperCase();
+    const photos = JSON.stringify(u.photos || []);
     run(
-      `INSERT INTO users (id, email, password_hash, username, display_name, avatar, bio, age, interests, country, is_online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-      [id, email, passwordHash, u.username, u.displayName, avatar, u.bio, u.age, JSON.stringify(u.interests), u.country || '']
+      `INSERT INTO users (id, email, password_hash, username, display_name, avatar, photos, bio, age, interests, country, is_online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [id, email, passwordHash, u.username, u.displayName, avatar, photos, u.bio, u.age, JSON.stringify(u.interests), u.country || '']
     );
   }
 

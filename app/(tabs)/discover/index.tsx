@@ -54,12 +54,22 @@ export default function DiscoverScreen() {
   const visibleProfiles = profiles.slice(currentIndex, currentIndex + 3);
   const topProfile = visibleProfiles[0];
 
-  // Reload profiles when we run out
+  // Reload profiles when we cycle past the end. Only refetch ONCE per
+  // empty state — if the backend keeps returning [], we stop trying so
+  // the empty UI stays visible (no infinite loop, no repeating the same
+  // people on every cycle).
+  const refetchedOnceRef = React.useRef(false);
   useEffect(() => {
     if (profiles.length > 0 && currentIndex >= profiles.length) {
-      init();
+      if (!refetchedOnceRef.current) {
+        refetchedOnceRef.current = true;
+        init();
+      }
+    } else if (currentIndex === 0) {
+      // Reset the flag whenever a fresh batch arrives at index 0
+      refetchedOnceRef.current = false;
     }
-  }, [currentIndex, profiles.length]);
+  }, [currentIndex, profiles.length, init]);
 
   // ===== Swipe gestures =====
   const translateX = useSharedValue(0);
@@ -122,6 +132,18 @@ export default function DiscoverScreen() {
   const rewindHintStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1]),
   }));
+
+  // The whole top card moves with the gesture — keeps gesture-handler
+  // tracking on the same view that's being transformed.
+  const cardTransformStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(translateX.value, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-12, 0, 12]);
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { rotate: `${rotate}deg` },
+      ],
+    };
+  });
 
   // ===== Send message =====
   const sendNow = useCallback(async (text: string) => {
@@ -197,8 +219,8 @@ export default function DiscoverScreen() {
               <SwipeCard key={profile.id} profile={profile} stackIndex={visibleProfiles.length - 1 - i} />
             ))}
             <GestureDetector gesture={panGesture}>
-              <Animated.View style={StyleSheet.absoluteFill}>
-                <SwipeCard profile={topProfile} isTop translateX={translateX} />
+              <Animated.View style={[StyleSheet.absoluteFill, cardTransformStyle]}>
+                <SwipeCard profile={topProfile} isTop />
                 <Animated.View pointerEvents="none" style={[styles.hintStamp, styles.hintLeft, skipHintStyle]}>
                   <Text style={styles.hintText}>SKIP</Text>
                 </Animated.View>
@@ -210,14 +232,30 @@ export default function DiscoverScreen() {
           </>
         ) : (
           <View style={styles.empty}>
-            <DiscoverIcon size={60} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>No more people nearby</Text>
+            <Text style={styles.emptyEmoji}>🌍</Text>
+            <Text style={styles.emptyTitle}>You've seen everyone</Text>
             <Text style={styles.emptyText}>
-              {scope === 'country' ? 'Try Worldwide for more matches.' : 'Check back later for new frnds!'}
+              {scope === 'country'
+                ? `No more new people in ${getCountry(currentUser?.country)?.name || 'your country'} right now.`
+                : "You've gone through everyone on frnds for now. New people join every day — check back soon!"}
             </Text>
-            <TouchableOpacity style={styles.refreshBtn} onPress={() => init()}>
-              <Text style={styles.refreshText}>Refresh</Text>
-            </TouchableOpacity>
+            <View style={styles.emptyActions}>
+              {scope === 'country' && (
+                <TouchableOpacity
+                  style={styles.emptyPrimary}
+                  onPress={() => setScope('world')}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient colors={[...Gradients.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyPrimaryInner}>
+                    <GlobeIcon size={16} color="#fff" />
+                    <Text style={styles.emptyPrimaryText}>Search Worldwide</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.emptySecondary} onPress={() => { refetchedOnceRef.current = false; init(); }}>
+                <Text style={styles.emptySecondaryText}>Refresh</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
@@ -351,9 +389,16 @@ const styles = StyleSheet.create({
   hintRight: { right: 24, borderColor: Colors.primaryLight, transform: [{ rotate: '12deg' }] },
   hintText: { color: '#fff', fontWeight: '900', fontSize: 24, letterSpacing: 1.2 },
 
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 8, marginTop: 16 },
-  emptyText: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', paddingHorizontal: 30 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  emptyEmoji: { fontSize: 64, marginBottom: 6 },
+  emptyTitle: { fontSize: 24, fontWeight: '900', color: Colors.text, marginBottom: 10, marginTop: 8, letterSpacing: -0.4 },
+  emptyText: { fontSize: 15, color: Colors.textMuted, textAlign: 'center', lineHeight: 22, maxWidth: 320 },
+  emptyActions: { marginTop: 24, gap: 10, alignItems: 'center', alignSelf: 'stretch' },
+  emptyPrimary: { borderRadius: 999, overflow: 'hidden' },
+  emptyPrimaryInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 12 },
+  emptyPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  emptySecondary: { paddingVertical: 8, paddingHorizontal: 16 },
+  emptySecondaryText: { color: Colors.primaryLight, fontWeight: '700', fontSize: 14 },
   refreshBtn: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: Colors.primary, borderRadius: 20 },
   refreshText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
