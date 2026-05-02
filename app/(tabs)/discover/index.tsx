@@ -255,7 +255,21 @@ export default function DiscoverScreen() {
             ))}
             <GestureDetector gesture={panGesture}>
               <Animated.View style={[StyleSheet.absoluteFill, cardTransformStyle]}>
-                <SwipeCard profile={topProfile} isTop photoIndex={photoIdx} />
+                <SwipeCard
+                  profile={topProfile}
+                  isTop
+                  photoIndex={photoIdx}
+                  onClose={handleSkip}
+                  onMore={() => Alert.alert(
+                    topProfile.displayName,
+                    'What would you like to do?',
+                    [
+                      { text: 'Skip', onPress: handleSkip },
+                      { text: 'Report', style: 'destructive', onPress: () => Alert.alert('Reported', 'Thanks for keeping frnds safe.') },
+                      { text: 'Cancel', style: 'cancel' },
+                    ]
+                  )}
+                />
                 {/* Nested tap zones for photo nav. Outer Pan wins on any drag. */}
                 {topPhotoCount > 1 && (
                   <>

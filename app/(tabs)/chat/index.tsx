@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useChatStore, useDiscoverStore, useRequestStore } from '../../../lib/store';
 import { Avatar } from '../../../components/Avatar';
+import { VerifiedBadge } from '../../../components/VerifiedBadge';
 import { SearchIcon, CheckIcon, CloseIcon } from '../../../components/Icons';
 import type { ChatPreview, MessageRequest } from '../../../types';
 
@@ -51,23 +52,45 @@ export default function ChatListScreen() {
       activeOpacity={0.7}
       onPress={() => router.push(`/(tabs)/chat/${item.user.id}`)}
     >
-      <Avatar initials={item.user.avatar} size={52} showOnline isOnline={item.user.isOnline} photo={item.user.photo} />
+      <Avatar
+        initials={item.user.avatar}
+        size={56}
+        shape="squircle"
+        showOnline
+        isOnline={item.user.isOnline}
+        photo={item.user.photo}
+      />
       <View style={styles.chatInfo}>
-        <Text style={styles.chatName}>{item.user.displayName}</Text>
-        <Text style={styles.chatLast} numberOfLines={1}>{item.lastMessage}</Text>
+        <View style={styles.chatNameRow}>
+          <Text style={styles.chatName} numberOfLines={1}>{item.user.displayName}</Text>
+          <VerifiedBadge size={14} />
+        </View>
+        <Text style={styles.chatLast} numberOfLines={1}>
+          {item.lastMessage}
+          <Text style={styles.chatTime}>{'  ·  ' + item.lastMessageTime}</Text>
+        </Text>
       </View>
-      <View style={styles.chatMeta}>
-        <Text style={styles.chatTime}>{item.lastMessageTime}</Text>
-        {item.unreadCount > 0 && <View style={styles.unreadDot} />}
-      </View>
+      {item.unreadCount > 0 && <View style={styles.unreadDot} />}
     </TouchableOpacity>
   );
 
   const renderRequest = ({ item }: { item: MessageRequest }) => (
     <View style={styles.requestItem}>
-      <Avatar initials={item.sender.avatar} size={52} photo={item.sender.photo} showOnline isOnline={item.sender.isOnline} />
+      <Avatar
+        initials={item.sender.avatar}
+        size={56}
+        shape="squircle"
+        photo={item.sender.photo}
+        showOnline
+        isOnline={item.sender.isOnline}
+      />
       <View style={styles.requestBody}>
-        <Text style={styles.requestName}>{item.sender.displayName}, <Text style={styles.requestAge}>{item.sender.age}</Text></Text>
+        <View style={styles.requestNameRow}>
+          <Text style={styles.requestName} numberOfLines={1}>
+            {item.sender.displayName}, <Text style={styles.requestAge}>{item.sender.age}</Text>
+          </Text>
+          <VerifiedBadge size={14} />
+        </View>
         <Text style={styles.requestMsg} numberOfLines={3}>{item.content}</Text>
       </View>
       <View style={styles.requestActions}>
@@ -136,8 +159,15 @@ export default function ChatListScreen() {
                     style={styles.matchItem}
                     onPress={() => router.push(`/(tabs)/chat/${item.id}`)}
                   >
-                    <Avatar initials={item.avatar} size={60} borderColor={Colors.accent} gradient={item.gradient} photo={item.photo} />
-                    <Text style={styles.matchName}>{item.displayName}</Text>
+                    <Avatar
+                      initials={item.avatar}
+                      size={64}
+                      shape="squircle"
+                      borderColor={Colors.accent}
+                      gradient={item.gradient}
+                      photo={item.photo}
+                    />
+                    <Text style={styles.matchName} numberOfLines={1}>{item.displayName.split(' ')[0]}</Text>
                   </TouchableOpacity>
                 )}
               />
@@ -202,15 +232,15 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, paddingVertical: 12, color: Colors.text, fontSize: 14 },
   matchesSection: { paddingHorizontal: 16, marginBottom: 16 },
   matchesTitle: { fontSize: 12, fontWeight: '700', color: Colors.textMuted, letterSpacing: 1, marginBottom: 10 },
-  matchItem: { alignItems: 'center', gap: 4 },
-  matchName: { fontSize: 12, color: Colors.textSecondary },
+  matchItem: { alignItems: 'center', gap: 4, width: 70 },
+  matchName: { fontSize: 12, color: Colors.text, fontWeight: '700' },
   list: { paddingBottom: 20 },
-  chatItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  chatInfo: { flex: 1 },
-  chatName: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
-  chatLast: { fontSize: 13, color: Colors.textMuted },
-  chatMeta: { alignItems: 'flex-end', gap: 4 },
-  chatTime: { fontSize: 12, color: Colors.textMuted },
+  chatItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
+  chatInfo: { flex: 1, minWidth: 0 },
+  chatNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
+  chatName: { fontSize: 16, fontWeight: '800', color: Colors.text, letterSpacing: -0.2, flexShrink: 1 },
+  chatLast: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
+  chatTime: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
   unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.accent },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.text, marginBottom: 6 },
@@ -229,8 +259,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  requestBody: { flex: 1 },
-  requestName: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 4 },
+  requestBody: { flex: 1, minWidth: 0 },
+  requestNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  requestName: { fontSize: 15, fontWeight: '800', color: Colors.text, flexShrink: 1 },
   requestAge: { fontWeight: '500', color: Colors.textMuted },
   requestMsg: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
   requestActions: { gap: 8 },

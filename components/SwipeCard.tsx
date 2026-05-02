@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Image, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
 import { getCountry } from '../constants/countries';
 import { decodeEditedPhoto } from '../lib/photo-format';
+import { CloseIcon, MoreIcon } from './Icons';
+import { VerifiedBadge } from './VerifiedBadge';
 import type { SwipeProfile } from '../types';
 
 interface Props {
@@ -14,6 +16,10 @@ interface Props {
   stackIndex?: number;
   /** Active photo index (parent-controlled so gestures live in the parent). */
   photoIndex?: number;
+  /** Top-left X tap. */
+  onClose?: () => void;
+  /** Top-right ... tap. */
+  onMore?: () => void;
 }
 
 /**
@@ -24,7 +30,7 @@ interface Props {
  * The non-top stack scaling/translate is still local because it doesn't
  * interact with the swipe gesture.
  */
-export function SwipeCard({ profile, isTop, stackIndex = 0, photoIndex = 0 }: Props) {
+export function SwipeCard({ profile, isTop, stackIndex = 0, photoIndex = 0, onClose, onMore }: Props) {
   const country = getCountry(profile.country);
 
   // Build a flat list of all photos for this profile: main photo first, then gallery
@@ -37,14 +43,19 @@ export function SwipeCard({ profile, isTop, stackIndex = 0, photoIndex = 0 }: Pr
 
   const photoIdx = Math.min(Math.max(photoIndex, 0), Math.max(0, photos.length - 1));
 
-  // Stack-only animation (top card stays still here — parent moves it)
+  // Stack-only animation (top card stays still here — parent moves it).
+  // Each card peeks out a bit on alternating sides so you can see them.
   const stackAnim = useAnimatedStyle(() => {
     if (isTop) return {};
+    const peekDirection = stackIndex % 2 === 1 ? -1 : 1;
     return {
       transform: [
         { scale: 1 - stackIndex * 0.04 },
-        { translateY: stackIndex * 8 },
+        { translateY: stackIndex * 6 },
+        { translateX: stackIndex * 8 * peekDirection },
+        { rotate: `${stackIndex * 1.5 * peekDirection}deg` },
       ],
+      opacity: 1 - stackIndex * 0.15,
     };
   });
 
@@ -96,24 +107,56 @@ export function SwipeCard({ profile, isTop, stackIndex = 0, photoIndex = 0 }: Pr
         pointerEvents="none"
       />
 
-      {/* Wizz-style top header (subtle, photo-first) */}
+      {/* Wizz-style top header — close left, name center, more right */}
       {isTop && (
-        <View style={styles.headerRow} pointerEvents="none">
-          <View style={styles.headerLeft}>
+        <View style={styles.headerRow}>
+          {/* Left: X close (skip) */}
+          {onClose ? (
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={12}
+              activeOpacity={0.7}
+              style={styles.headerIconBtn}
+            >
+              <CloseIcon size={22} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerIconBtn} />
+          )}
+
+          {/* Middle: name + age + flag + online */}
+          <View style={styles.headerMiddle} pointerEvents="none">
             <View style={styles.headerNameRow}>
               <Text style={styles.headerName} numberOfLines={1}>
                 {profile.displayName.split(' ')[0]}
               </Text>
+              <VerifiedBadge size={14} />
+              {profile.isOnline && (
+                <View style={styles.onlinePill}>
+                  <Text style={styles.onlineText}>is online now</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.headerSubRow}>
               <Text style={styles.headerAge}>{profile.age}</Text>
               {country && <Text style={styles.headerFlag}>{country.flag}</Text>}
+              <Text style={styles.headerCity}>{country?.name || ''}</Text>
             </View>
-            {profile.isOnline && (
-              <View style={styles.onlinePill}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>online now</Text>
-              </View>
-            )}
           </View>
+
+          {/* Right: more (...) */}
+          {onMore ? (
+            <TouchableOpacity
+              onPress={onMore}
+              hitSlop={12}
+              activeOpacity={0.7}
+              style={styles.headerIconBtn}
+            >
+              <MoreIcon size={22} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerIconBtn} />
+          )}
         </View>
       )}
 
@@ -186,26 +229,31 @@ const styles = StyleSheet.create({
 
   // Header — sits ABOVE the photo (positioned with absolute)
   headerRow: {
-    position: 'absolute', top: 22, left: 16, right: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    position: 'absolute', top: 22, left: 12, right: 12,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
     zIndex: 5,
   },
-  headerLeft: { flex: 1, gap: 4 },
-  headerNameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  headerIconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  headerMiddle: { flex: 1, paddingTop: 4 },
+  headerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   headerName: {
-    color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4,
+    color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3,
     textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  headerAge: { color: '#fff', fontSize: 14, fontWeight: '700', opacity: 0.85 },
-  headerFlag: { fontSize: 16 },
+  headerSubRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  headerAge: { color: '#fff', fontSize: 13, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  headerFlag: { fontSize: 15 },
+  headerCity: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
   onlinePill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#22c55e',
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
   },
-  onlineDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  onlineText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
+  onlineText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
   // Bottom info
   bottomInfo: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 18, paddingBottom: 22 },
