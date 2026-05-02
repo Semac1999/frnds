@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions,
   Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Keyboard,
@@ -54,6 +54,27 @@ export default function DiscoverScreen() {
   const visibleProfiles = profiles.slice(currentIndex, currentIndex + 3);
   const topProfile = visibleProfiles[0];
 
+  // Photo navigation state for the top card (lifted out of SwipeCard so it
+  // doesn't fight the swipe gesture).
+  const [photoIdx, setPhotoIdx] = React.useState(0);
+  React.useEffect(() => {
+    setPhotoIdx(0);
+  }, [topProfile?.id]);
+
+  const topPhotoCount = useMemo(() => {
+    if (!topProfile) return 0;
+    return (topProfile.photo ? 1 : 0) + (topProfile.photos?.length || 0);
+  }, [topProfile]);
+
+  const photoPrev = useCallback(() => {
+    if (topPhotoCount <= 1) return;
+    setPhotoIdx((i) => Math.max(0, i - 1));
+  }, [topPhotoCount]);
+  const photoNext = useCallback(() => {
+    if (topPhotoCount <= 1) return;
+    setPhotoIdx((i) => Math.min(topPhotoCount - 1, i + 1));
+  }, [topPhotoCount]);
+
   // Reload profiles when we cycle past the end. Only refetch ONCE per
   // empty state — if the backend keeps returning [], we stop trying so
   // the empty UI stays visible (no infinite loop, no repeating the same
@@ -94,7 +115,8 @@ export default function DiscoverScreen() {
     setPaywallOpen(true);
   }, []);
 
-  // Pure pan gesture — no minDistance, no race. Activates on any drag.
+  // Pure pan gesture — no minDistance constraint. Activates on any drag,
+  // wins races against the photo-nav taps because taps require zero motion.
   const panGesture = Gesture.Pan()
     .onUpdate((e) => {
       translateX.value = e.translationX;
@@ -144,6 +166,19 @@ export default function DiscoverScreen() {
       ],
     };
   });
+
+  // Photo-nav taps. maxDistance:5 means any drag > 5px disqualifies the
+  // tap, so Pan wins on movement. Nested under the outer Pan detector,
+  // gesture-handler auto-composes: tap fires on still touch, pan on drag.
+  const tapPrevGesture = Gesture.Tap()
+    .maxDistance(5)
+    .maxDuration(300)
+    .onEnd(() => { runOnJS(photoPrev)(); });
+
+  const tapNextGesture = Gesture.Tap()
+    .maxDistance(5)
+    .maxDuration(300)
+    .onEnd(() => { runOnJS(photoNext)(); });
 
   // ===== Send message =====
   const sendNow = useCallback(async (text: string) => {
@@ -220,7 +255,18 @@ export default function DiscoverScreen() {
             ))}
             <GestureDetector gesture={panGesture}>
               <Animated.View style={[StyleSheet.absoluteFill, cardTransformStyle]}>
-                <SwipeCard profile={topProfile} isTop />
+                <SwipeCard profile={topProfile} isTop photoIndex={photoIdx} />
+                {/* Nested tap zones for photo nav. Outer Pan wins on any drag. */}
+                {topPhotoCount > 1 && (
+                  <>
+                    <GestureDetector gesture={tapPrevGesture}>
+                      <View style={[styles.photoTapZone, { left: 0 }]} />
+                    </GestureDetector>
+                    <GestureDetector gesture={tapNextGesture}>
+                      <View style={[styles.photoTapZone, { right: 0 }]} />
+                    </GestureDetector>
+                  </>
+                )}
                 <Animated.View pointerEvents="none" style={[styles.hintStamp, styles.hintLeft, skipHintStyle]}>
                   <Text style={styles.hintText}>SKIP</Text>
                 </Animated.View>
@@ -380,6 +426,13 @@ const styles = StyleSheet.create({
   storiesBar: { paddingHorizontal: 10, paddingVertical: 4, gap: 6, alignItems: 'center' },
 
   cardStack: { flex: 1, marginHorizontal: 10, marginTop: 2, marginBottom: 4 },
+  photoTapZone: {
+    position: 'absolute',
+    top: 0, bottom: 0,
+    width: '35%',
+    // Transparent — gesture-handler reads taps without intercepting drags
+    // (the outer Pan gesture wins on any movement > 5px).
+  },
   hintStamp: {
     position: 'absolute', top: 80,
     paddingVertical: 6, paddingHorizontal: 16,

@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, useWindowDimensions, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, Image, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { Colors } from '../constants/colors';
 import { getCountry } from '../constants/countries';
 import { decodeEditedPhoto } from '../lib/photo-format';
@@ -12,6 +12,8 @@ interface Props {
   isTop?: boolean;
   /** Stack position (1, 2, ...) for non-top cards. */
   stackIndex?: number;
+  /** Active photo index (parent-controlled so gestures live in the parent). */
+  photoIndex?: number;
 }
 
 /**
@@ -22,8 +24,7 @@ interface Props {
  * The non-top stack scaling/translate is still local because it doesn't
  * interact with the swipe gesture.
  */
-export function SwipeCard({ profile, isTop, stackIndex = 0 }: Props) {
-  const { width: SCREEN_WIDTH } = useWindowDimensions();
+export function SwipeCard({ profile, isTop, stackIndex = 0, photoIndex = 0 }: Props) {
   const country = getCountry(profile.country);
 
   // Build a flat list of all photos for this profile: main photo first, then gallery
@@ -34,12 +35,7 @@ export function SwipeCard({ profile, isTop, stackIndex = 0 }: Props) {
     return list;
   }, [profile.photo, profile.photos]);
 
-  const [photoIdx, setPhotoIdx] = useState(0);
-
-  // Reset to first photo when this card becomes the top card or profile changes
-  useEffect(() => {
-    setPhotoIdx(0);
-  }, [profile.id]);
+  const photoIdx = Math.min(Math.max(photoIndex, 0), Math.max(0, photos.length - 1));
 
   // Stack-only animation (top card stays still here — parent moves it)
   const stackAnim = useAnimatedStyle(() => {
@@ -60,9 +56,6 @@ export function SwipeCard({ profile, isTop, stackIndex = 0 }: Props) {
     photoUri.startsWith('data:image') || photoUri.startsWith('http') || photoUri.startsWith('file:')
   );
 
-  const goPrev = () => setPhotoIdx((i) => (i > 0 ? i - 1 : 0));
-  const goNext = () => setPhotoIdx((i) => (i < photos.length - 1 ? i + 1 : i));
-
   return (
     <Animated.View style={[styles.card, stackAnim, { zIndex: 10 - stackIndex }]}>
       {hasPhoto ? (
@@ -78,23 +71,8 @@ export function SwipeCard({ profile, isTop, stackIndex = 0 }: Props) {
         </LinearGradient>
       )}
 
-      {/* Photo navigation tap zones — only on the top card and only when there are multiple photos */}
-      {isTop && photos.length > 1 && (
-        <>
-          <TouchableOpacity
-            activeOpacity={1}
-            style={[styles.photoTapZone, styles.photoTapLeft]}
-            onPress={goPrev}
-          />
-          <TouchableOpacity
-            activeOpacity={1}
-            style={[styles.photoTapZone, styles.photoTapRight]}
-            onPress={goNext}
-          />
-        </>
-      )}
-
-      {/* Progress bars at the very top (Wizz / Stories style) */}
+      {/* Progress bars at the very top (Wizz / Stories style). pointerEvents:none
+          so they NEVER intercept gestures — the parent owns photo nav now. */}
       {isTop && photos.length > 1 && (
         <View style={styles.progressRow} pointerEvents="none">
           {photos.map((_, i) => (
@@ -187,16 +165,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.22)',
     letterSpacing: 4,
   },
-
-  // Photo tap zones (left half / right half)
-  photoTapZone: {
-    position: 'absolute',
-    top: 0, bottom: 0,
-    width: '40%',
-    // No background — fully transparent tap target
-  },
-  photoTapLeft: { left: 0 },
-  photoTapRight: { right: 0 },
 
   // Progress bars (Stories style)
   progressRow: {
